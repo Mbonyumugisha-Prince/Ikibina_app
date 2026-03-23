@@ -10,6 +10,8 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
+
   Future<UserModel> signUp({
     required String name,
     required String email,
@@ -21,6 +23,8 @@ class AuthService {
       password: password,
     );
     await credential.user!.updateDisplayName(name);
+    // Send verification email immediately after account creation
+    await credential.user!.sendEmailVerification();
 
     final user = UserModel(
       id: credential.user!.uid,
@@ -34,6 +38,14 @@ class AuthService {
         .doc(user.id)
         .set(user.toMap());
     return user;
+  }
+
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  Future<void> reloadUser() async {
+    await _auth.currentUser?.reload();
   }
 
   Future<UserModel?> signIn({

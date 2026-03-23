@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../../providers/locale_provider.dart';
 import '../auth/login_screen.dart';
-import '../auth/register_screen.dart';
+import '../language/language_selection_screen.dart';
 
-// ─────────────────────────────────────────
 //  COLOURS
-// ─────────────────────────────────────────
 const _bg = Color(0xFFF2F2F2);
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF666666);
 const _dimmed = Color(0xFF999999);
 const _dotInactive = Color(0xFFC8C8C8);
-const _badgeBg = Color(0xFFE8E8E8);
 
-// ─────────────────────────────────────────
-//  ONBOARDING FLOW
-// ─────────────────────────────────────────
+
+//  ONBOARDING FLOW  (2 pages — splash already covers the brand intro)
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({super.key});
 
@@ -26,6 +24,9 @@ class OnboardingFlow extends StatefulWidget {
 class _OnboardingFlowState extends State<OnboardingFlow> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+
+  // Total pages = 2
+  static const _totalPages = 2;
 
   @override
   void dispose() {
@@ -41,42 +42,52 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
+  void _goToLanguage() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LanguageSelectionScreen()),
+    );
+  }
+
+  void _goToLogin() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final s = context.watch<LocaleProvider>().strings;
+    final isLastPage = _currentPage == _totalPages - 1;
+
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
         child: Stack(
           children: [
-            // ── Swipeable pages ──
+            // Swipeable pages (Page 2 + Page 3 from original flow)
             PageView(
               controller: _pageController,
               onPageChanged: (i) => setState(() => _currentPage = i),
               children: [
-                const _Page1(),
-                const _Page2(),
-                _Page3(
-                  onGetStarted: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                        builder: (_) => const RegisterScreen()),
-                  ),
-                  onLogin: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  ),
+                _PageSaveTogether(s: s),
+                _PageTrackWithdraw(
+                  s: s,
+                  onGetStarted: _goToLanguage,
+                  onLogin: _goToLogin,
                 ),
               ],
             ),
 
-            // ── Skip button — pages 0 & 1 only ──
-            if (_currentPage < 2)
+            // Skip button — page 0 only
+            if (!isLastPage)
               Positioned(
                 top: 16,
                 right: 16,
                 child: TextButton(
-                  onPressed: () => _goToPage(2),
+                  onPressed: () => _goToPage(_totalPages - 1),
                   child: Text(
-                    'Skip',
-                    style: TextStyle(
+                    s.skip,
+                    style: const TextStyle(
                       color: _dimmed,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -85,8 +96,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ),
               ),
 
-            // ── Next button — pages 0 & 1 only ──
-            if (_currentPage < 2)
+            // Next arrow button — page 0 only
+            if (!isLastPage)
               Positioned(
                 bottom: 80,
                 right: 24,
@@ -108,20 +119,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ),
               ),
 
-            // ── Dot indicators — all pages ──
+            // Dot indicators — all pages
             Positioned(
               bottom: 52,
               left: 0,
               right: 0,
-              child: _DotsIndicator(currentPage: _currentPage),
+              child: _DotsIndicator(
+                currentPage: _currentPage,
+                totalPages: _totalPages,
+              ),
             ),
 
-            // ── Secure label — all pages ──
-            const Positioned(
+            // Secure label — all pages
+            Positioned(
               bottom: 16,
               left: 0,
               right: 0,
-              child: _SecureLabel(),
+              child: _SecureLabel(label: s.secure),
             ),
           ],
         ),
@@ -130,106 +144,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 }
 
-// ─────────────────────────────────────────
-//  PAGE 1 — Brand Splash
-// ─────────────────────────────────────────
-class _Page1 extends StatelessWidget {
-  const _Page1();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: _bg,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(flex: 3),
-
-          // ── Logo stack ──
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  color: _ink,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _ink.withValues(alpha: 0.2),
-                      blurRadius: 28,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.savings,
-                  color: Colors.white,
-                  size: 44,
-                ),
-              ),
-              // Badge top-right
-              Positioned(
-                top: -6,
-                right: -6,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: _badgeBg,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: const Icon(
-                    Icons.group,
-                    color: _ink,
-                    size: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 28),
-
-          // ── Title ──
-          const Text(
-            'Ikimina',
-            style: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w700,
-              color: _ink,
-              letterSpacing: -0.5,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // ── Subtitle ──
-          const Text(
-            'Smart Group Savings, Made Simple',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w400,
-              color: _muted,
-            ),
-          ),
-
-          const Spacer(flex: 2),
-          // Space for positioned bottom widgets
-          const SizedBox(height: 100),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────
-//  PAGE 2 — Save Together, Grow Together
-// ─────────────────────────────────────────
-class _Page2 extends StatelessWidget {
-  const _Page2();
+//  PAGE 1 — Save Together, Grow Together
+class _PageSaveTogether extends StatelessWidget {
+  final dynamic s;
+  const _PageSaveTogether({required this.s});
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +158,6 @@ class _Page2 extends StatelessWidget {
         children: [
           const Spacer(flex: 2),
 
-          // ── Illustration box ──
           Container(
             width: 180,
             height: 180,
@@ -255,20 +172,15 @@ class _Page2 extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.people_alt,
-              color: Colors.white,
-              size: 80,
-            ),
+            child: const Icon(Icons.people_alt, color: Colors.white, size: 80),
           ),
 
           const SizedBox(height: 36),
 
-          // ── Title ──
-          const Text(
-            'Save Together,\nGrow Together',
+          Text(
+            s.onboardingTitle2,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w700,
               color: _ink,
@@ -278,11 +190,10 @@ class _Page2 extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          // ── Subtitle ──
-          const Text(
-            'Create or join a savings group with\nfriends, family or colleagues.\nEveryone contributes, everyone benefits.',
+          Text(
+            s.onboardingSubtitle2,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
               color: _muted,
               height: 1.6,
@@ -290,7 +201,6 @@ class _Page2 extends StatelessWidget {
           ),
 
           const Spacer(flex: 3),
-          // Space for positioned bottom widgets (dots + next + secure)
           const SizedBox(height: 110),
         ],
       ),
@@ -298,14 +208,18 @@ class _Page2 extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────
-//  PAGE 3 — Track & Withdraw Anytime (CTA)
-// ─────────────────────────────────────────
-class _Page3 extends StatelessWidget {
+
+//  PAGE 2 — Track & Withdraw Anytime (CTA)
+class _PageTrackWithdraw extends StatelessWidget {
+  final dynamic s;
   final VoidCallback onGetStarted;
   final VoidCallback onLogin;
 
-  const _Page3({required this.onGetStarted, required this.onLogin});
+  const _PageTrackWithdraw({
+    required this.s,
+    required this.onGetStarted,
+    required this.onLogin,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +230,6 @@ class _Page3 extends StatelessWidget {
         children: [
           const Spacer(flex: 2),
 
-          // ── Illustration box ──
           Container(
             width: 180,
             height: 180,
@@ -334,28 +247,20 @@ class _Page3 extends StatelessWidget {
             child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.account_balance_wallet,
-                  color: Colors.white,
-                  size: 56,
-                ),
+                Icon(Icons.account_balance_wallet,
+                    color: Colors.white, size: 56),
                 SizedBox(height: 8),
-                Icon(
-                  Icons.bar_chart,
-                  color: Colors.white,
-                  size: 32,
-                ),
+                Icon(Icons.bar_chart, color: Colors.white, size: 32),
               ],
             ),
           ),
 
           const SizedBox(height: 36),
 
-          // ── Title ──
-          const Text(
-            'Track Savings &\nWithdraw Anytime',
+          Text(
+            s.onboardingTitle3,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w700,
               color: _ink,
@@ -365,11 +270,10 @@ class _Page3 extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          // ── Subtitle ──
-          const Text(
-            'Monitor your group\'s progress in\nreal time. Request withdrawals\nwhenever you\'re ready.',
+          Text(
+            s.onboardingSubtitle3,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
               color: _muted,
               height: 1.6,
@@ -377,11 +281,9 @@ class _Page3 extends StatelessWidget {
           ),
 
           const Spacer(flex: 2),
-
-          // ── CTA Buttons ──
           const SizedBox(height: 40),
 
-          // Primary — Get Started
+          // Primary — Get Started → Language Selection
           SizedBox(
             width: double.infinity,
             height: 54,
@@ -396,7 +298,7 @@ class _Page3 extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'Get Started',
+                s.getStarted,
                 style: GoogleFonts.sora(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -408,19 +310,15 @@ class _Page3 extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // Secondary — Already have an account
+          // Secondary — Already have an account → Login
           TextButton(
             onPressed: onLogin,
-            child: const Text(
-              'I already have an account',
-              style: TextStyle(
-                color: _dimmed,
-                fontSize: 14,
-              ),
+            child: Text(
+              s.alreadyHaveAccount,
+              style: const TextStyle(color: _dimmed, fontSize: 14),
             ),
           ),
 
-          // Space for positioned dots + secure label
           const SizedBox(height: 90),
         ],
       ),
@@ -428,18 +326,17 @@ class _Page3 extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────
 //  SHARED — Dot Indicators
-// ─────────────────────────────────────────
 class _DotsIndicator extends StatelessWidget {
   final int currentPage;
-  const _DotsIndicator({required this.currentPage});
+  final int totalPages;
+  const _DotsIndicator({required this.currentPage, required this.totalPages});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (i) {
+      children: List.generate(totalPages, (i) {
         final active = i == currentPage;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 250),
@@ -456,22 +353,21 @@ class _DotsIndicator extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────
 //  SHARED — Secure Label
-// ─────────────────────────────────────────
 class _SecureLabel extends StatelessWidget {
-  const _SecureLabel();
+  final String label;
+  const _SecureLabel({required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: const [
-        Icon(Icons.lock_outline, size: 12, color: _dimmed),
-        SizedBox(width: 5),
+      children: [
+        const Icon(Icons.lock_outline, size: 12, color: _dimmed),
+        const SizedBox(width: 5),
         Text(
-          'SECURE',
-          style: TextStyle(
+          label,
+          style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: _dimmed,
