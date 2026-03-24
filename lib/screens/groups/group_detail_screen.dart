@@ -55,7 +55,8 @@ class GroupDetailScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _statChip(Icons.group, '${group.memberCount} members'),
+                        _statChip(
+                            Icons.group, '${group.members.length} members'),
                         const SizedBox(width: 16),
                         _statChip(Icons.repeat, group.contributionFrequency),
                       ],

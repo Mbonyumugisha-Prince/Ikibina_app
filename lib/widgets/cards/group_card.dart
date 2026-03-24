@@ -14,7 +14,7 @@ class GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final s = context.watch<LocaleProvider>().strings;
-    
+
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -50,7 +50,7 @@ class GroupCard extends StatelessWidget {
                             ?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
                     Text(
-                      '${group.memberCount} members · ${group.contributionFrequency}',
+                      '${group.members.length} members · ${group.contributionFrequency}',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
