@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../l10n/app_strings.dart';
+import '../../widgets/common/error_banner.dart';
 
 const _bg     = Color(0xFFF5F5F5);
 const _ink    = Color(0xFF1A1A1A);
@@ -20,7 +21,8 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
-  bool _sent = false;
+  bool    _sent         = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -28,10 +30,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  void _showError(String msg) => setState(() => _errorMessage = msg);
+
   Future<void> _submit(AppStrings s) async {
+    setState(() => _errorMessage = null);
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      _snack(s.enterEmailFirst);
+      _showError(s.enterEmailFirst);
       return;
     }
     final auth    = context.read<AuthProvider>();
@@ -40,19 +45,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (success) {
       setState(() => _sent = true);
     } else {
-      _snack(auth.error ?? s.failedToSend);
+      _showError(auth.error ?? s.failedToSend);
     }
-  }
-
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.sora()),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   @override
@@ -144,6 +138,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
 
         const SizedBox(height: 32),
+
+        if (_errorMessage != null) ...[
+          ErrorBanner(message: _errorMessage!),
+          const SizedBox(height: 16),
+        ],
 
         // ── Send button ──
         SizedBox(

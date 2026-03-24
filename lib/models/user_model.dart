@@ -6,7 +6,10 @@ class UserModel {
   final String email;
   final String? phone;
   final String? photoUrl;
+  final bool emailVerified;
   final DateTime createdAt;
+  final String? activeGroupId;
+  final String? activeGroupRole;
 
   UserModel({
     required this.id,
@@ -14,7 +17,10 @@ class UserModel {
     required this.email,
     this.phone,
     this.photoUrl,
+    this.emailVerified = false,
     required this.createdAt,
+    this.activeGroupId,
+    this.activeGroupRole,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -24,7 +30,10 @@ class UserModel {
       email: map['email'] ?? '',
       phone: map['phone'],
       photoUrl: map['photoUrl'],
+      emailVerified: map['emailVerified'] as bool? ?? false,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
+      activeGroupId: map['activeGroupId'] as String?,
+      activeGroupRole: map['activeGroupRole'] as String?,
     );
   }
 
@@ -34,7 +43,10 @@ class UserModel {
       'email': email,
       'phone': phone,
       'photoUrl': photoUrl,
+      'emailVerified': emailVerified,
       'createdAt': Timestamp.fromDate(createdAt),
+      'activeGroupId': activeGroupId,
+      'activeGroupRole': activeGroupRole,
     };
   }
 }

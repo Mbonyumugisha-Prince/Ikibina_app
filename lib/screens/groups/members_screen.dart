@@ -1,22 +1,24 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../../models/transaction_model.dart';
-import '../../services/firestore_service.dart';
-import '../../providers/locale_provider.dart';
+import '../../models/user_model.dart';
 
 const _bg   = Color(0xFFF5F5F5);
 const _ink  = Color(0xFF1A1A1A);
 const _grey = Color(0xFF888888);
 
-class TransactionsScreen extends StatelessWidget {
+class MembersScreen extends StatelessWidget {
   final String groupId;
-  const TransactionsScreen({super.key, required this.groupId});
+  final String groupName;
+
+  const MembersScreen({
+    super.key,
+    required this.groupId,
+    required this.groupName,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final s = context.watch<LocaleProvider>().strings;
-    
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -27,7 +29,7 @@ class TransactionsScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          s.transactions,
+          'Members',
           style: GoogleFonts.sora(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -36,41 +38,53 @@ class TransactionsScreen extends StatelessWidget {
         ),
         centerTitle: false,
       ),
-      body: StreamBuilder<List<TransactionModel>>(
-        stream: FirestoreService().getGroupTransactions(groupId),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .where('activeGroupId', isEqualTo: groupId)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
-                child: CircularProgressIndicator(color: _ink));
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(s.failedToLoadTransactions,
-                  style: GoogleFonts.sora(color: _grey)),
+              child: CircularProgressIndicator(color: _ink),
             );
           }
 
-          final items = snapshot.data ?? [];
-          if (items.isEmpty) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Failed to load members.',
+                style: GoogleFonts.sora(color: _grey),
+              ),
+            );
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          if (docs.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.receipt_long_outlined,
-                      size: 48, color: _grey),
+                  const Icon(Icons.people_outline, size: 48, color: _grey),
                   const SizedBox(height: 12),
-                  Text(s.noTransactionsYet,
-                      style: GoogleFonts.sora(fontSize: 14, color: _grey)),
+                  Text(
+                    'No members yet.',
+                    style: GoogleFonts.sora(fontSize: 14, color: _grey),
+                  ),
                 ],
               ),
             );
           }
 
+          final members = docs.map((d) {
+            return UserModel.fromMap(d.id, d.data() as Map<String, dynamic>);
+          }).toList();
+
           return ListView.separated(
             padding: const EdgeInsets.all(20),
-            itemCount: items.length,
+            itemCount: members.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (_, i) => _TransactionTile(item: items[i]),
+            itemBuilder: (_, i) => _MemberTile(member: members[i]),
           );
         },
       ),
@@ -78,25 +92,16 @@ class TransactionsScreen extends StatelessWidget {
   }
 }
 
-class _TransactionTile extends StatelessWidget {
-  final TransactionModel item;
-  const _TransactionTile({required this.item});
+class _MemberTile extends StatelessWidget {
+  final UserModel member;
+  const _MemberTile({required this.member});
 
   @override
   Widget build(BuildContext context) {
-    final isCredit =
-        item.type == 'contribution' || item.type == 'fine';
-    final dateStr =
-        '${item.date.day}/${item.date.month}/${item.date.year}';
-    final typeLabel = item.type[0].toUpperCase() + item.type.substring(1);
-
-    final iconData = switch (item.type) {
-      'contribution' => Icons.add_card_outlined,
-      'withdrawal'   => Icons.account_balance_wallet_outlined,
-      'loan'         => Icons.money_outlined,
-      'fine'         => Icons.warning_amber_outlined,
-      _              => Icons.swap_horiz_outlined,
-    };
+    final initials = member.name.isNotEmpty
+        ? member.name.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase()
+        : '?';
+    final isAdmin = member.activeGroupRole == 'admin';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -111,10 +116,19 @@ class _TransactionTile extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: _bg,
+              color: _ink,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(iconData, color: _ink, size: 22),
+            child: Center(
+              child: Text(
+                initials,
+                style: GoogleFonts.sora(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -122,7 +136,7 @@ class _TransactionTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.userName,
+                  member.name,
                   style: GoogleFonts.sora(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -130,20 +144,25 @@ class _TransactionTile extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '$typeLabel · $dateStr',
+                  member.email,
                   style: GoogleFonts.sora(fontSize: 12, color: _grey),
                 ),
               ],
             ),
           ),
-          Text(
-            '${isCredit ? '+' : '-'} RWF ${item.amount.toStringAsFixed(0)}',
-            style: GoogleFonts.sora(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: isCredit
-                  ? const Color(0xFF2E7D32)
-                  : const Color(0xFFC62828),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isAdmin ? _ink : const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              isAdmin ? 'Admin' : 'Member',
+              style: GoogleFonts.sora(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isAdmin ? Colors.white : _grey,
+              ),
             ),
           ),
         ],

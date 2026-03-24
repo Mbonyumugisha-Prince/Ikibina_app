@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/group_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../providers/locale_provider.dart';
 
 class GroupCard extends StatelessWidget {
   final GroupModel group;
@@ -11,6 +13,8 @@ class GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = context.watch<LocaleProvider>().strings;
+    
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -63,7 +67,7 @@ class GroupCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text('Total savings', style: theme.textTheme.labelSmall),
+                  Text(s.totalSavings, style: theme.textTheme.labelSmall),
                 ],
               ),
             ],
