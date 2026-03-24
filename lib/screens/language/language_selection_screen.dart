@@ -32,8 +32,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   void initState() {
     super.initState();
     // Initialize from whatever language is currently active
-    _selected =
-        context.read<LocaleProvider>().languageName;
+    _selected = context.read<LocaleProvider>().languageName;
   }
 
   Future<void> _saveAndContinue() async {
@@ -41,9 +40,14 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     // Switch the app locale immediately
     await context.read<LocaleProvider>().setLanguage(_selected);
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
   }
 
   @override
@@ -136,8 +140,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                 shape: BoxShape.circle,
               ),
               child: Center(
-                child: Text(lang.flag,
-                    style: const TextStyle(fontSize: 22)),
+                child: Text(lang.flag, style: const TextStyle(fontSize: 22)),
               ),
             ),
             const SizedBox(width: 14),
@@ -173,8 +176,8 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                       shape: BoxShape.circle,
                       color: _ink,
                     ),
-                    child: const Icon(Icons.check,
-                        color: Colors.white, size: 14),
+                    child:
+                        const Icon(Icons.check, color: Colors.white, size: 14),
                   )
                 : Container(
                     width: 22,
