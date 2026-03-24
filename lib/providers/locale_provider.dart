@@ -17,7 +17,8 @@ class LocaleProvider extends ChangeNotifier {
 
   Future<void> _loadSaved() async {
     final saved = await LanguageService.load();
-    _apply(saved, notify: false);
+    // Apply saved language and notify listeners if not English
+    _apply(saved, notify: saved != 'English');
   }
 
   Future<void> setLanguage(String languageName) async {

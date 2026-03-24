@@ -5,7 +5,10 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../l10n/app_strings.dart';
-import '../../screens/home/home_screen.dart';
+import '../../widgets/common/error_banner.dart';
+import '../groups/group_setup_screen.dart';
+import '../home/admin_home_screen.dart';
+import '../home/member_home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'email_verification_screen.dart';
@@ -26,7 +29,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController    = TextEditingController();
   final _passwordController = TextEditingController();
-  bool  _obscurePassword    = true;
+  bool   _obscurePassword   = true;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -35,11 +39,14 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _showError(String msg) => setState(() => _errorMessage = msg);
+
   Future<void> _handleLogin(AppStrings s) async {
+    setState(() => _errorMessage = null);
     final email    = _emailController.text.trim();
     final password = _passwordController.text;
     if (email.isEmpty || password.isEmpty) {
-      _snack(s.fillAllFields);
+      _showError(s.fillAllFields);
       return;
     }
 
@@ -48,37 +55,40 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (!success) {
-      _snack(auth.error ?? s.loginFailed);
+      _showError(auth.error ?? s.loginFailed);
       return;
     }
 
     // Check email verification
     if (!auth.isEmailVerified) {
+      final displayName = auth.user?.name ?? '';
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => EmailVerificationScreen(email: email),
+          builder: (_) => EmailVerificationScreen(
+            email: email,
+            name: displayName,
+          ),
         ),
       );
       return;
     }
 
-    // Fully verified → go home
+    // Fully verified → route based on role
+    final role = auth.user?.activeGroupRole;
+    final Widget destination;
+    if (role == 'admin') {
+      destination = const AdminHomeScreen();
+    } else if (role == 'member') {
+      destination = const MemberHomeScreen();
+    } else {
+      destination = const GroupSetupScreen();
+    }
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => destination),
       (_) => false,
     );
   }
 
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.sora()),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +109,10 @@ class _LoginScreenState extends State<LoginScreen> {
               _passwordField(s),
               _forgotPassword(s),
               const SizedBox(height: 24),
+              if (_errorMessage != null) ...[
+                ErrorBanner(message: _errorMessage!),
+                const SizedBox(height: 16),
+              ],
               _loginButton(s, loading),
               const SizedBox(height: 32),
               _footer(s),

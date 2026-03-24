@@ -8,9 +8,7 @@ import '../screens/home/home_screen.dart';
 import '../screens/groups/groups_screen.dart';
 import '../screens/groups/group_detail_screen.dart';
 import '../screens/groups/create_group_screen.dart';
-import '../screens/contributions/contributions_screen.dart';
 import '../screens/contributions/add_contribution_screen.dart';
-import '../screens/transactions/transactions_screen.dart';
 import '../screens/profile/profile_screen.dart';
 
 class AppRoutes {
@@ -50,9 +48,7 @@ class AppRoutes {
         path: groupDetail,
         builder: (_, state) => GroupDetailScreen(groupId: state.pathParameters['id']!),
       ),
-      GoRoute(path: contributions, builder: (_, __) => const ContributionsScreen()),
       GoRoute(path: addContribution, builder: (_, __) => const AddContributionScreen()),
-      GoRoute(path: transactions, builder: (_, __) => const TransactionsScreen()),
       GoRoute(path: profile, builder: (_, __) => const ProfileScreen()),
     ],
   );

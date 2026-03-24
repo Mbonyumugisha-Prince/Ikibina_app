@@ -1,8 +1,14 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/auth_service.dart';
 import '../Unsplash/on_boarding_screen.dart';
+import '../auth/email_verification_screen.dart';
 import '../auth/login_screen.dart';
+import '../groups/group_setup_screen.dart';
+import '../home/admin_home_screen.dart';
+import '../home/member_home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -76,19 +82,61 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateNext() async {
-    final prefs     = await SharedPreferences.getInstance();
-    final savedLang = prefs.getString('selected_language');
+    final prefs      = await SharedPreferences.getInstance();
+    final savedLang  = prefs.getString('selected_language');
+
+    // Check if a Firebase user is already signed in
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+
     if (!mounted) return;
 
-    // First time → show onboarding (which leads to language → login)
-    // Returning  → go straight to login
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => savedLang == null
-            ? const OnboardingFlow()
-            : const LoginScreen(),
-      ),
-    );
+    // ─────────────────────────────────────────────────────────
+    // IMPORTANT: Language MUST be selected first, always
+    // ─────────────────────────────────────────────────────────
+    if (savedLang == null) {
+      // No language selected → show onboarding flow
+      // (which includes language selection)
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => const OnboardingFlow(),
+      ));
+      return;
+    }
+
+    // Language is selected, now check authentication
+    if (firebaseUser == null) {
+      // Not logged in, language selected → go to login
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => const LoginScreen(),
+      ));
+      return;
+    }
+
+    // Logged in → fetch Firestore profile to check verification + role
+    final authService = AuthService();
+    final user = await authService.getCurrentUserProfile();
+
+    if (!mounted) return;
+
+    if (user == null || !user.emailVerified) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => EmailVerificationScreen(
+          email: firebaseUser.email ?? '',
+          name: firebaseUser.displayName ?? '',
+        ),
+      ));
+      return;
+    }
+
+    if (user.activeGroupRole == 'admin') {
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AdminHomeScreen()));
+    } else if (user.activeGroupRole == 'member') {
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MemberHomeScreen()));
+    } else {
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const GroupSetupScreen()));
+    }
   }
 
   @override

@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../l10n/app_strings.dart';
 import '../../widgets/auth/country_picker_field.dart';
+import '../../widgets/common/error_banner.dart';
 import 'login_screen.dart';
 import 'email_verification_screen.dart';
 
@@ -29,10 +30,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmController  = TextEditingController();
 
-  String _countryCode     = '+250';
-  bool   _obscurePassword = true;
-  bool   _obscureConfirm  = true;
-  bool   _agreedToTerms   = false;
+  String  _countryCode     = '+250';
+  bool    _obscurePassword = true;
+  bool    _obscureConfirm  = true;
+  bool    _agreedToTerms   = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -44,7 +46,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  void _showError(String msg) => setState(() => _errorMessage = msg);
+
   Future<void> _handleSignUp(AppStrings s) async {
+    setState(() => _errorMessage = null);
     final name     = _nameController.text.trim();
     final email    = _emailController.text.trim();
     final phone    = '$_countryCode${_phoneController.text.trim()}';
@@ -53,15 +58,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (name.isEmpty || email.isEmpty ||
         _phoneController.text.trim().isEmpty || password.isEmpty) {
-      _snack(s.fillAllFields);
+      _showError(s.fillAllFields);
       return;
     }
     if (password != confirm) {
-      _snack(s.passwordsNoMatch);
+      _showError(s.passwordsNoMatch);
       return;
     }
     if (!_agreedToTerms) {
-      _snack(s.acceptTerms);
+      _showError(s.acceptTerms);
       return;
     }
 
@@ -76,23 +81,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (success) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => EmailVerificationScreen(email: email),
+          builder: (_) => EmailVerificationScreen(
+            email: email,
+            name: name,
+          ),
         ),
       );
     } else {
-      _snack(auth.error ?? s.loginFailed);
+      _showError(auth.error ?? s.loginFailed);
     }
-  }
-
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.sora()),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   @override
@@ -148,6 +145,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               _terms(s),
               const SizedBox(height: 24),
+              if (_errorMessage != null) ...[
+                ErrorBanner(message: _errorMessage!),
+                const SizedBox(height: 16),
+              ],
               _signUpButton(s, loading),
               _footer(s),
             ],

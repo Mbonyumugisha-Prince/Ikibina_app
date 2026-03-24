@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../config/routes.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/cards/contribution_card.dart';
@@ -15,6 +17,7 @@ class GroupDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final service = FirestoreService();
     final theme = Theme.of(context);
+    final s = context.watch<LocaleProvider>().strings;
 
     return FutureBuilder(
       future: service.getGroup(groupId),
@@ -26,7 +29,7 @@ class GroupDetailScreen extends StatelessWidget {
         if (group == null) {
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(child: Text('Group not found')),
+            body: Center(child: Text(s.groupNotFound)),
           );
         }
         return Scaffold(
@@ -47,7 +50,7 @@ class GroupDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text('Total Savings'),
+                    Text(s.totalSavings),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -82,7 +85,7 @@ class GroupDetailScreen extends StatelessWidget {
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => context.push(AppRoutes.addContribution),
             icon: const Icon(Icons.add),
-            label: const Text('Add Contribution'),
+            label: Text(s.addContribution),
           ),
         );
       },
