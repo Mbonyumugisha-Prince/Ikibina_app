@@ -13,8 +13,8 @@ import '../groups/members_screen.dart';
 import '../profile/profile_screen.dart';
 import '../transactions/transactions_screen.dart';
 
-const _bg   = Color(0xFFF5F5F5);
-const _ink  = Color(0xFF1A1A1A);
+const _bg = Color(0xFFF5F5F5);
+const _ink = Color(0xFF1A1A1A);
 const _grey = Color(0xFF888888);
 
 class MemberHomeScreen extends StatefulWidget {
@@ -27,21 +27,23 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
-      if (auth.user != null) {
-        context.read<GroupProvider>().loadUserGroups(auth.user!.id);
-      }
-    });
+    // Groups are loaded in the build method once the user object is available
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth   = context.watch<AuthProvider>();
+    final auth = context.watch<AuthProvider>();
     final groupP = context.watch<GroupProvider>();
-    final s      = context.watch<LocaleProvider>().strings;
-    final group  = groupP.currentGroup;
-    final user   = auth.user;
+    final s = context.watch<LocaleProvider>().strings;
+    final group = groupP.currentGroup;
+    final user = auth.user;
+
+    // Auto-load groups once the user object is available
+    if (user != null && !groupP.hasAttemptedLoad && !groupP.loading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<GroupProvider>().loadUserGroups(user.id);
+      });
+    }
 
     return Scaffold(
       backgroundColor: _bg,
@@ -86,11 +88,9 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border:
-                            Border.all(color: const Color(0xFFE0E0E0)),
+                        border: Border.all(color: const Color(0xFFE0E0E0)),
                       ),
-                      child:
-                          const Icon(Icons.more_vert, color: _ink, size: 20),
+                      child: const Icon(Icons.more_vert, color: _ink, size: 20),
                     ),
                     onSelected: (val) {
                       if (val == 'signout') {
@@ -121,7 +121,7 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
 
               const SizedBox(height: 28),
 
-              if (groupP.loading && !groupP.hasAttemptedLoad)
+              if (!groupP.hasAttemptedLoad || groupP.loading)
                 Center(
                   child: Column(
                     children: [
@@ -138,7 +138,8 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                   child: Column(
                     children: [
                       const SizedBox(height: 60),
-                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 48),
                       const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -159,7 +160,9 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                         child: ElevatedButton(
                           onPressed: () {
                             if (auth.user != null) {
-                              context.read<GroupProvider>().loadUserGroups(auth.user!.id);
+                              context
+                                  .read<GroupProvider>()
+                                  .loadUserGroups(auth.user!.id);
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -248,7 +251,8 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                   stream: FirestoreService().getGroupContributions(group.id),
                   builder: (context, snap) {
                     final contributions = snap.data ?? [];
-                    final groupTotal = contributions.fold(0.0, (sum, c) => sum + c.amount);
+                    final groupTotal =
+                        contributions.fold(0.0, (sum, c) => sum + c.amount);
                     final myTotal = contributions
                         .where((c) => c.userId == user?.id)
                         .fold(0.0, (sum, c) => sum + c.amount);
@@ -296,7 +300,8 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                                       'RWF ${groupTotal.toStringAsFixed(0)}',
                                       s.groupTotal),
                                   const SizedBox(width: 12),
-                                  _statChip('${group.memberCount}', s.members),
+                                  _statChip(
+                                      '${group.members.length}', s.members),
                                 ],
                               ),
                             ],
@@ -312,7 +317,8 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                                color: Colors.blue.withValues(alpha: 0.4), width: 1.5),
+                                color: Colors.blue.withValues(alpha: 0.4),
+                                width: 1.5),
                           ),
                           child: Row(
                             children: [
@@ -554,8 +560,7 @@ class _ActionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border:
-              Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
+          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
         ),
         child: Column(
           children: [

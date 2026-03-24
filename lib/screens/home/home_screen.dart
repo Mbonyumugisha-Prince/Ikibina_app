@@ -21,10 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final auth = context.read<AuthProvider>();
-    if (auth.user != null) {
-      context.read<GroupProvider>().loadUserGroups(auth.user!.id);
-    }
+    // Groups are loaded in the build method once the user object is available
   }
 
   @override
@@ -33,6 +30,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final groupProvider = context.watch<GroupProvider>();
     final s = context.watch<LocaleProvider>().strings;
     final theme = Theme.of(context);
+
+    // Auto-load groups once the user object is available
+    if (auth.user != null &&
+        !groupProvider.hasAttemptedLoad &&
+        !groupProvider.loading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<GroupProvider>().loadUserGroups(auth.user!.id);
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -54,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 context.read<GroupProvider>().loadUserGroups(auth.user!.id);
               }
             },
-            child: groupProvider.loading
+            child: !groupProvider.hasAttemptedLoad || groupProvider.loading
                 ? LoadingIndicator(message: s.loadingGroup)
                 : groupProvider.groups.isEmpty
                     ? Center(
@@ -86,8 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: GroupCard(
                             group: groupProvider.groups[i],
-                            onTap: () => context.push(
-                                '/groups/${groupProvider.groups[i].id}'),
+                            onTap: () => context
+                                .push('/groups/${groupProvider.groups[i].id}'),
                           ),
                         ),
                       ),
