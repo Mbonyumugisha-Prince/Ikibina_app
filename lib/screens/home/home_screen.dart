@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../config/routes.dart';
 import '../../widgets/cards/group_card.dart';
 import '../../widgets/common/loading_indicator.dart';
@@ -30,11 +31,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final groupProvider = context.watch<GroupProvider>();
+    final s = context.watch<LocaleProvider>().strings;
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ikibina'),
+        title: Text(s.ikibina),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
@@ -53,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             child: groupProvider.loading
-                ? const LoadingIndicator(message: 'Loading groups...')
+                ? LoadingIndicator(message: s.loadingGroup)
                 : groupProvider.groups.isEmpty
                     ? Center(
                         child: Column(
@@ -62,17 +64,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             Icon(Icons.group_outlined,
                                 size: 64, color: Colors.grey[400]),
                             const SizedBox(height: 16),
-                            Text('No groups yet',
+                            Text(s.noGroupsYet,
                                 style: theme.textTheme.titleMedium),
                             const SizedBox(height: 8),
-                            Text('Create or join a savings group',
+                            Text(s.createOrJoinGroup,
                                 style: theme.textTheme.bodySmall),
                             const SizedBox(height: 24),
                             ElevatedButton.icon(
                               onPressed: () =>
                                   context.push(AppRoutes.createGroup),
                               icon: const Icon(Icons.add),
-                              label: const Text('Create Group'),
+                              label: Text(s.createGroup),
                             ),
                           ],
                         ),
@@ -91,9 +93,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
           ),
           // Groups tab
-          const Center(child: Text('Groups')),
+          Center(child: Text(s.groups)),
           // Transactions tab
-          const Center(child: Text('Transactions')),
+          Center(child: Text(s.transactions)),
         ],
       ),
       floatingActionButton: _currentIndex == 0

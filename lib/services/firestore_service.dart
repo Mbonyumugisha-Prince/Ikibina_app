@@ -18,10 +18,24 @@ class FirestoreService {
   }
 
   Future<GroupModel> createGroup(GroupModel group, String userId) async {
-    final doc = await _db
-        .collection(AppConstants.groupsCollection)
-        .add({...group.toMap(), 'members': [userId]});
-    return GroupModel.fromMap(doc.id, group.toMap());
+    final batch = _db.batch();
+    final groupRef = _db.collection(AppConstants.groupsCollection).doc();
+    final groupData = {
+      ...group.toMap(),
+      'adminId': userId,
+      'members': [userId],
+      'inviteCode': group.inviteCode,
+    };
+    batch.set(groupRef, groupData);
+    // Update user's activeGroupId and activeGroupRole
+    final userRef =
+        _db.collection(AppConstants.usersCollection).doc(userId);
+    batch.update(userRef, {
+      'activeGroupId': groupRef.id,
+      'activeGroupRole': 'admin',
+    });
+    await batch.commit();
+    return GroupModel.fromMap(groupRef.id, groupData);
   }
 
   Future<GroupModel?> getGroup(String groupId) async {
@@ -33,16 +47,59 @@ class FirestoreService {
     return GroupModel.fromMap(doc.id, doc.data()!);
   }
 
+  Future<GroupModel?> getGroupByInviteCode(String code) async {
+    final snap = await _db
+        .collection(AppConstants.groupsCollection)
+        .where('inviteCode', isEqualTo: code.toUpperCase())
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return null;
+    return GroupModel.fromMap(snap.docs.first.id, snap.docs.first.data());
+  }
+
+  Future<GroupModel?> joinGroup(String inviteCode, String userId) async {
+    final group = await getGroupByInviteCode(inviteCode);
+    if (group == null) return null;
+    final batch = _db.batch();
+    final groupRef =
+        _db.collection(AppConstants.groupsCollection).doc(group.id);
+    batch.update(groupRef, {
+      'members': FieldValue.arrayUnion([userId]),
+      'memberCount': FieldValue.increment(1),
+    });
+    final userRef =
+        _db.collection(AppConstants.usersCollection).doc(userId);
+    batch.update(userRef, {
+      'activeGroupId': group.id,
+      'activeGroupRole': 'member',
+    });
+    await batch.commit();
+    return group;
+  }
+
+  Future<GroupModel?> getUserFirstGroup(String userId) async {
+    final snap = await _db
+        .collection(AppConstants.groupsCollection)
+        .where('members', arrayContains: userId)
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return null;
+    return GroupModel.fromMap(snap.docs.first.id, snap.docs.first.data());
+  }
+
   // Contributions
   Stream<List<ContributionModel>> getGroupContributions(String groupId) {
     return _db
         .collection(AppConstants.contributionsCollection)
         .where('groupId', isEqualTo: groupId)
-        .orderBy('date', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => ContributionModel.fromMap(d.id, d.data()))
-            .toList());
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => ContributionModel.fromMap(d.id, d.data()))
+              .toList();
+          list.sort((a, b) => b.date.compareTo(a.date));
+          return list;
+        });
   }
 
   Future<void> addContribution(ContributionModel contribution) async {
@@ -65,10 +122,13 @@ class FirestoreService {
     return _db
         .collection(AppConstants.transactionsCollection)
         .where('groupId', isEqualTo: groupId)
-        .orderBy('date', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => TransactionModel.fromMap(d.id, d.data()))
-            .toList());
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => TransactionModel.fromMap(d.id, d.data()))
+              .toList();
+          list.sort((a, b) => b.date.compareTo(a.date));
+          return list;
+        });
   }
 }

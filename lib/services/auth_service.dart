@@ -23,8 +23,7 @@ class AuthService {
       password: password,
     );
     await credential.user!.updateDisplayName(name);
-    // Send verification email immediately after account creation
-    await credential.user!.sendEmailVerification();
+    // OTP email is sent via Cloud Function — no Firebase link needed
 
     final user = UserModel(
       id: credential.user!.uid,
@@ -38,10 +37,6 @@ class AuthService {
         .doc(user.id)
         .set(user.toMap());
     return user;
-  }
-
-  Future<void> sendEmailVerification() async {
-    await _auth.currentUser?.sendEmailVerification();
   }
 
   Future<void> reloadUser() async {

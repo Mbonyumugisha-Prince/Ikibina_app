@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/group_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../config/routes.dart';
 import '../../widgets/cards/group_card.dart';
 import '../../widgets/common/loading_indicator.dart';
@@ -12,9 +13,10 @@ class GroupsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groupProvider = context.watch<GroupProvider>();
+    final s = context.watch<LocaleProvider>().strings;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Groups')),
+      appBar: AppBar(title: Text(s.myGroupsTitle)),
       body: groupProvider.loading
           ? const LoadingIndicator()
           : ListView.builder(
