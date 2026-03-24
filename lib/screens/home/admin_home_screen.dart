@@ -15,8 +15,8 @@ import '../groups/invite_member_screen.dart';
 import '../groups/members_screen.dart';
 import '../transactions/transactions_screen.dart';
 
-const _bg   = Color(0xFFF5F5F5);
-const _ink  = Color(0xFF1A1A1A);
+const _bg = Color(0xFFF5F5F5);
+const _ink = Color(0xFF1A1A1A);
 const _grey = Color(0xFF888888);
 
 class AdminHomeScreen extends StatefulWidget {
@@ -29,21 +29,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
-      if (auth.user != null) {
-        context.read<GroupProvider>().loadUserGroups(auth.user!.id);
-      }
-    });
+    // Groups are loaded in the build method once the user object is available
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth   = context.watch<AuthProvider>();
+    final auth = context.watch<AuthProvider>();
     final groupP = context.watch<GroupProvider>();
-    final s      = context.watch<LocaleProvider>().strings;
-    final group  = groupP.currentGroup;
-    final user   = auth.user;
+    final s = context.watch<LocaleProvider>().strings;
+    final group = groupP.currentGroup;
+    final user = auth.user;
+
+    // Auto-load groups once the user object is available
+    if (user != null && !groupP.hasAttemptedLoad && !groupP.loading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<GroupProvider>().loadUserGroups(user.id);
+      });
+    }
 
     return Scaffold(
       backgroundColor: _bg,
@@ -88,11 +90,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border:
-                            Border.all(color: const Color(0xFFE0E0E0)),
+                        border: Border.all(color: const Color(0xFFE0E0E0)),
                       ),
-                      child:
-                          const Icon(Icons.more_vert, color: _ink, size: 20),
+                      child: const Icon(Icons.more_vert, color: _ink, size: 20),
                     ),
                     onSelected: (val) {
                       if (val == 'signout') {
@@ -123,7 +123,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
               const SizedBox(height: 28),
 
-              if (groupP.loading && !groupP.hasAttemptedLoad)
+              if (!groupP.hasAttemptedLoad || groupP.loading)
                 Center(
                   child: Column(
                     children: [
@@ -140,7 +140,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   child: Column(
                     children: [
                       const SizedBox(height: 60),
-                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 48),
                       const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -161,7 +162,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         child: ElevatedButton(
                           onPressed: () {
                             if (auth.user != null) {
-                              context.read<GroupProvider>().loadUserGroups(auth.user!.id);
+                              context
+                                  .read<GroupProvider>()
+                                  .loadUserGroups(auth.user!.id);
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -250,7 +253,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   stream: FirestoreService().getGroupContributions(group.id),
                   builder: (context, snap) {
                     final contributions = snap.data ?? [];
-                    final groupTotal = contributions.fold(0.0, (sum, c) => sum + c.amount);
+                    final groupTotal =
+                        contributions.fold(0.0, (sum, c) => sum + c.amount);
 
                     // Per-member totals map: userId -> {name, total}
                     final memberTotals = <String, Map<String, dynamic>>{};
@@ -265,7 +269,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       );
                     }
                     final memberList = memberTotals.values.toList()
-                      ..sort((a, b) => (b['total'] as double).compareTo(a['total'] as double));
+                      ..sort((a, b) => (b['total'] as double)
+                          .compareTo(a['total'] as double));
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,7 +315,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                       'RWF ${groupTotal.toStringAsFixed(0)}',
                                       s.totalSavings),
                                   const SizedBox(width: 12),
-                                  _statChip('${group.memberCount}', s.members),
+                                  _statChip(
+                                      '${group.members.length}', s.members),
                                 ],
                               ),
                             ],
@@ -333,7 +339,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ...memberList.map((m) {
                             final name = m['name'] as String;
                             final total = m['total'] as double;
-                            final initials = name.trim().split(' ')
+                            final initials = name
+                                .trim()
+                                .split(' ')
                                 .map((w) => w.isNotEmpty ? w[0] : '')
                                 .take(2)
                                 .join()
@@ -413,7 +421,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    context.watch<LocaleProvider>().strings.groupInviteCode,
+                                    context
+                                        .watch<LocaleProvider>()
+                                        .strings
+                                        .groupInviteCode,
                                     style: GoogleFonts.sora(
                                       fontSize: 10,
                                       color: _grey,
@@ -443,16 +454,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        context.read<LocaleProvider>().strings.codeCopiedMessage,
-                                        style: GoogleFonts.sora()),
+                                          context
+                                              .read<LocaleProvider>()
+                                              .strings
+                                              .codeCopiedMessage,
+                                          style: GoogleFonts.sora()),
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12)),
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
                                       margin: const EdgeInsets.all(16),
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.copy_outlined, color: _ink),
+                                icon: const Icon(Icons.copy_outlined,
+                                    color: _ink),
                               ),
                             ],
                           ),
@@ -460,7 +476,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         Padding(
                           padding: const EdgeInsets.only(top: 6, left: 4),
                           child: Text(
-                            context.watch<LocaleProvider>().strings.shareCodeWithMembers,
+                            context
+                                .watch<LocaleProvider>()
+                                .strings
+                                .shareCodeWithMembers,
                             style: GoogleFonts.sora(fontSize: 12, color: _grey),
                           ),
                         ),
@@ -475,13 +494,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => InviteMemberScreen(
-                                  groupId:    group.id,
-                                  groupName:  group.name,
+                                  groupId: group.id,
+                                  groupName: group.name,
                                   inviteCode: group.inviteCode,
                                 ),
                               ),
                             ),
-                            icon: const Icon(Icons.person_add_outlined, size: 20),
+                            icon:
+                                const Icon(Icons.person_add_outlined, size: 20),
                             label: Text(
                               s.inviteMember,
                               style: GoogleFonts.sora(
@@ -517,7 +537,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 label: s.addContribution,
                                 onTap: () => Navigator.of(context).push(
                                   MaterialPageRoute(
-                                      builder: (_) => const AddContributionScreen()),
+                                      builder: (_) =>
+                                          const AddContributionScreen()),
                                 ),
                               ),
                             ),
@@ -583,8 +604,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Widget _statChip(String value, String label) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
@@ -629,8 +649,7 @@ class _ActionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border:
-              Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
+          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
         ),
         child: Column(
           children: [
