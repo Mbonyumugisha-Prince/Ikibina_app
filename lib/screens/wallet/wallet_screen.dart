@@ -25,6 +25,15 @@ class WalletScreen extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final userId = auth.user?.id ?? '';
 
+    // Single group: skip the picker, show the wallet directly.
+    if (!groupP.loading && groupP.groups.length == 1) {
+      return WalletDetailScreen(
+        group: groupP.groups.first,
+        userId: userId,
+        showBackButton: false,
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
@@ -42,7 +51,7 @@ class WalletScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
               child: Text(
-                '${groupP.groups.length} group${groupP.groups.length == 1 ? '' : 's'}',
+                '${groupP.groups.length} groups',
                 style: GoogleFonts.sora(fontSize: 13, color: _grey),
               ),
             ),
@@ -217,9 +226,14 @@ class _WalletGroupCard extends StatelessWidget {
 class WalletDetailScreen extends StatefulWidget {
   final GroupModel group;
   final String userId;
+  final bool showBackButton;
 
-  const WalletDetailScreen(
-      {super.key, required this.group, required this.userId});
+  const WalletDetailScreen({
+    super.key,
+    required this.group,
+    required this.userId,
+    this.showBackButton = true,
+  });
 
   @override
   State<WalletDetailScreen> createState() => _WalletDetailScreenState();
@@ -302,10 +316,12 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: _ink),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
+            leading: widget.showBackButton
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back, color: _ink),
+                    onPressed: () => Navigator.of(context).pop(),
+                  )
+                : null,
             title: isAdmin
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
