@@ -87,6 +87,34 @@ class FirestoreService {
     return GroupModel.fromMap(snap.docs.first.id, snap.docs.first.data());
   }
 
+  Future<void> removeMember(String groupId, String memberId) async {
+    final batch = _db.batch();
+    final groupRef = _db.collection(AppConstants.groupsCollection).doc(groupId);
+    batch.update(groupRef, {
+      'members': FieldValue.arrayRemove([memberId]),
+      'suspendedMembers': FieldValue.arrayRemove([memberId]),
+      'memberCount': FieldValue.increment(-1),
+    });
+    final userRef = _db.collection(AppConstants.usersCollection).doc(memberId);
+    batch.update(userRef, {
+      'activeGroupId': FieldValue.delete(),
+      'activeGroupRole': FieldValue.delete(),
+    });
+    await batch.commit();
+  }
+
+  Future<void> suspendMember(String groupId, String memberId) async {
+    await _db.collection(AppConstants.groupsCollection).doc(groupId).update({
+      'suspendedMembers': FieldValue.arrayUnion([memberId]),
+    });
+  }
+
+  Future<void> unsuspendMember(String groupId, String memberId) async {
+    await _db.collection(AppConstants.groupsCollection).doc(groupId).update({
+      'suspendedMembers': FieldValue.arrayRemove([memberId]),
+    });
+  }
+
   // Contributions
   Stream<List<ContributionModel>> getGroupContributions(String groupId) {
     return _db

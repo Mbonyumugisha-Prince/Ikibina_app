@@ -12,6 +12,7 @@ class GroupModel {
   final double totalSavings;
   final int memberCount;
   final List<String> members;
+  final List<String> suspendedMembers;
   final String? imageUrl;
   final DateTime createdAt;
 
@@ -27,6 +28,7 @@ class GroupModel {
     this.totalSavings = 0,
     this.memberCount = 0,
     this.members = const [],
+    this.suspendedMembers = const [],
     this.imageUrl,
     required this.createdAt,
   }) : adminId = adminId ?? createdBy;
@@ -43,6 +45,7 @@ class GroupModel {
       contributionFrequency: map['contributionFrequency'] ?? 'Monthly',
       totalSavings: (map['totalSavings'] ?? 0).toDouble(),
       members: List<String>.from(map['members'] ?? []),
+      suspendedMembers: List<String>.from(map['suspendedMembers'] ?? []),
       memberCount: map['memberCount'] ?? 0,
       imageUrl: map['imageUrl'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
@@ -61,6 +64,7 @@ class GroupModel {
       'totalSavings': totalSavings,
       'memberCount': memberCount,
       'members': members,
+      'suspendedMembers': suspendedMembers,
       'imageUrl': imageUrl,
       'createdAt': Timestamp.fromDate(createdAt),
     };
