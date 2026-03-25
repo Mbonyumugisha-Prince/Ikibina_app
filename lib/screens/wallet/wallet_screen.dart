@@ -393,8 +393,10 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) =>
-                                    const AddContributionScreen()),
+                              builder: (_) => AddContributionScreen(
+                                group: widget.group,
+                              ),
+                            ),
                           );
                         }
                       },

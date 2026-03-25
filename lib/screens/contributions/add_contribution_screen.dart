@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import '../../models/contribution_model.dart';
+import '../../models/group_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
-import '../../models/contribution_model.dart';
 
 const _bg   = Color(0xFFF5F5F5);
 const _ink  = Color(0xFF1A1A1A);
 const _grey = Color(0xFF888888);
 
 class AddContributionScreen extends StatefulWidget {
-  const AddContributionScreen({super.key});
+  /// When provided, contributions go to this specific group.
+  /// When null, falls back to GroupProvider.currentGroup.
+  final GroupModel? group;
+
+  const AddContributionScreen({super.key, this.group});
 
   @override
   State<AddContributionScreen> createState() => _AddContributionScreenState();
@@ -53,9 +58,10 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
     final auth = context.read<AuthProvider>();
     final groupProvider = context.read<GroupProvider>();
     final s = context.read<LocaleProvider>().strings;
+    final targetGroup = widget.group ?? groupProvider.currentGroup;
 
     try {
-      if (groupProvider.currentGroup == null) {
+      if (targetGroup == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -71,7 +77,7 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
 
       final contribution = ContributionModel(
         id: const Uuid().v4(),
-        groupId: groupProvider.currentGroup!.id,
+        groupId: targetGroup.id,
         userId: auth.user!.id,
         userName: auth.user!.name,
         amount: amount,
@@ -129,7 +135,7 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
   Widget build(BuildContext context) {
     final groupProvider = context.watch<GroupProvider>();
     final s = context.watch<LocaleProvider>().strings;
-    final group = groupProvider.currentGroup;
+    final group = widget.group ?? groupProvider.currentGroup;
 
     return Scaffold(
       backgroundColor: _bg,
