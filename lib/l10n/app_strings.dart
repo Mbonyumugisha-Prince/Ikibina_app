@@ -228,6 +228,18 @@ abstract class AppStrings {
   String get support;
   String get penalties;
   String get contactUs;
+  String get myWallet;
+  String get groupWallet;
+  String get totalBalance;
+  String get deposit;
+  String get transfer;
+  String get loan;
+  String get transactionHistory;
+  String get filterAll;
+  String get filterContributions;
+  String get filterPayouts;
+  String get filterWithdrawals;
+
 }
 
 // ─────────────────────────────────────────
@@ -650,6 +662,29 @@ class EnStrings extends AppStrings {
   String get penalties => 'Penalties';
   @override
   String get contactUs => 'Contact Us';
+  @override
+  String get myWallet => 'My Wallet';
+  @override
+  String get groupWallet => 'Group Wallet';
+  @override
+  String get totalBalance => 'Total Balance';
+  @override
+  String get deposit => 'Deposit';
+  @override
+  String get transfer => 'Transfer';
+  @override
+  String get loan => 'Loan';
+  @override
+  String get transactionHistory => 'Transaction History';
+  @override
+  String get filterAll => 'All';
+  @override
+  String get filterContributions => 'Contributions';
+  @override
+  String get filterPayouts => 'Payouts';
+  @override
+  String get filterWithdrawals => 'Withdrawals';
+
 }
 
 // ─────────────────────────────────────────
@@ -1075,4 +1110,27 @@ class RwStrings extends AppStrings {
   String get penalties => 'Ibihano';
   @override
   String get contactUs => 'Twandikire';
+  @override
+  String get myWallet => 'Agakapu Kanjye';
+  @override
+  String get groupWallet => 'Agakapu k\'Itsinda';
+  @override
+  String get totalBalance => 'Amafaranga yose hamwe';
+  @override
+  String get deposit => 'Kuzuza';
+  @override
+  String get transfer => 'Kohereza';
+  @override
+  String get loan => 'Kuguriza';
+  @override
+  String get transactionHistory => 'Amateka y\'ibyakozwe';
+  @override
+  String get filterAll => 'Byose';
+  @override
+  String get filterContributions => 'Imisanzu';
+  @override
+  String get filterPayouts => 'Kwaka';
+  @override
+  String get filterWithdrawals => 'Kubikuza';
+
 }
