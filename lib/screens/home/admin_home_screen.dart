@@ -2,18 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../../core/utils/formatters.dart';
 import '../../models/contribution_model.dart';
+import '../../models/group_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/firestore_service.dart';
-import '../auth/login_screen.dart';
 import '../contributions/add_contribution_screen.dart';
-import '../contributions/contributions_screen.dart';
 import '../groups/create_group_screen.dart';
-import '../groups/invite_member_screen.dart';
-import '../groups/members_screen.dart';
-import '../transactions/transactions_screen.dart';
+import '../groups/join_group_screen.dart';
 import '../profile/profile_screen.dart';
 import '../wallet/wallet_screen.dart';
 
@@ -31,12 +29,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _currentIndex = 0;
 
   @override
-  void initState() {
-    super.initState();
-    // Groups are loaded in the build method once the user object is available
-  }
-
-  @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final groupP = context.watch<GroupProvider>();
@@ -44,7 +36,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     final group = groupP.currentGroup;
     final user = auth.user;
 
-    // Auto-load groups once the user object is available
     if (user != null && !groupP.hasAttemptedLoad && !groupP.loading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<GroupProvider>().loadUserGroups(user.id);
@@ -84,48 +75,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             ),
                             Text(
                               s.groupAdmin,
-                              style:
-                                  GoogleFonts.sora(fontSize: 13, color: _grey),
+                              style: GoogleFonts.sora(fontSize: 13, color: _grey),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      PopupMenuButton<String>(
-                        icon: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE0E0E0)),
-                          ),
-                          child: const Icon(Icons.more_vert,
-                              color: _ink, size: 20),
-                        ),
-                        onSelected: (val) {
-                          if (val == 'signout') {
-                            context.read<AuthProvider>().signOut();
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                  builder: (_) => const LoginScreen()),
-                              (_) => false,
-                            );
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'signout',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.logout, size: 18, color: _ink),
-                                const SizedBox(width: 10),
-                                Text(s.signOut,
-                                    style: GoogleFonts.sora(fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
@@ -139,8 +92,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           const SizedBox(height: 60),
                           const CircularProgressIndicator(color: _ink),
                           const SizedBox(height: 16),
-                          Text(s.loadingGroup,
-                              style: GoogleFonts.sora(color: _grey)),
+                          Text(s.loadingGroup, style: GoogleFonts.sora(color: _grey)),
                         ],
                       ),
                     )
@@ -149,8 +101,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       child: Column(
                         children: [
                           const SizedBox(height: 60),
-                          const Icon(Icons.error_outline,
-                              color: Colors.red, size: 48),
+                          const Icon(Icons.error_outline, color: Colors.red, size: 48),
                           const SizedBox(height: 16),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -171,9 +122,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             child: ElevatedButton(
                               onPressed: () {
                                 if (auth.user != null) {
-                                  context
-                                      .read<GroupProvider>()
-                                      .loadUserGroups(auth.user!.id);
+                                  context.read<GroupProvider>().loadUserGroups(auth.user!.id);
                                 }
                               },
                               style: ElevatedButton.styleFrom(
@@ -200,8 +149,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       child: Column(
                         children: [
                           const SizedBox(height: 60),
-                          Icon(Icons.group_add_outlined,
-                              color: _grey, size: 64),
+                          Icon(Icons.group_add_outlined, color: _grey, size: 64),
                           const SizedBox(height: 16),
                           Text(
                             s.noGroupsYet,
@@ -217,399 +165,190 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             child: Text(
                               s.createOrJoinGroup,
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.sora(
-                                fontSize: 13,
-                                color: _grey,
-                              ),
+                              style: GoogleFonts.sora(fontSize: 13, color: _grey),
                             ),
                           ),
                           const SizedBox(height: 32),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 140,
-                                height: 48,
-                                child: ElevatedButton.icon(
-                                  onPressed: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const CreateGroupScreen(),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.add, size: 20),
-                                  label: Text(
-                                    s.createGroup,
-                                    style: GoogleFonts.sora(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _ink,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
+                          SizedBox(
+                            width: 140,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+                              ),
+                              icon: const Icon(Icons.add, size: 20),
+                              label: Text(
+                                s.createGroup,
+                                style: GoogleFonts.sora(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _ink,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     )
                   else if (group != null)
-                    StreamBuilder<List<ContributionModel>>(
-                      stream:
-                          FirestoreService().getGroupContributions(group.id),
-                      builder: (context, snap) {
-                        final contributions = snap.data ?? [];
-                        final groupTotal =
-                            contributions.fold(0.0, (sum, c) => sum + c.amount);
-
-                        // Per-member totals map: userId -> {name, total}
-                        final memberTotals = <String, Map<String, dynamic>>{};
-                        for (final c in contributions) {
-                          memberTotals.update(
-                            c.userId,
-                            (m) {
-                              m['total'] = (m['total'] as double) + c.amount;
-                              return m;
-                            },
-                            ifAbsent: () =>
-                                {'name': c.userName, 'total': c.amount},
-                          );
-                        }
-                        final memberList = memberTotals.values.toList()
-                          ..sort((a, b) => (b['total'] as double)
-                              .compareTo(a['total'] as double));
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ── Group overview card ──
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: _ink,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    s.groupOverview,
-                                    style: GoogleFonts.sora(
-                                      fontSize: 10,
-                                      color: Colors.white60,
-                                      letterSpacing: 2,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    group.name,
-                                    style: GoogleFonts.sora(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  Text(
-                                    group.contributionFrequency,
-                                    style: GoogleFonts.sora(
-                                        fontSize: 13, color: Colors.white60),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      _statChip(
-                                          'RWF ${groupTotal.toStringAsFixed(0)}',
-                                          s.totalSavings),
-                                      const SizedBox(width: 12),
-                                      _statChip(
-                                          '${group.members.length}', s.members),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // ── Member contributions breakdown ──
-                            if (memberList.isNotEmpty) ...[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Group overview card ──
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: _ink,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                'Member Contributions',
+                                s.groupOverview,
                                 style: GoogleFonts.sora(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: _ink,
+                                  fontSize: 10,
+                                  color: Colors.white60,
+                                  letterSpacing: 2,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 10),
-                              ...memberList.map((m) {
-                                final name = m['name'] as String;
-                                final total = m['total'] as double;
-                                final initials = name
-                                    .trim()
-                                    .split(' ')
-                                    .map((w) => w.isNotEmpty ? w[0] : '')
-                                    .take(2)
-                                    .join()
-                                    .toUpperCase();
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: const Color(0xFFE0E0E0),
-                                          width: 1),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            color: _bg,
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              initials,
-                                              style: GoogleFonts.sora(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w700,
-                                                color: _ink,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            name,
-                                            style: GoogleFonts.sora(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: _ink,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Text(
-                                          'RWF ${total.toStringAsFixed(0)}',
-                                          style: GoogleFonts.sora(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: _ink,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
                               const SizedBox(height: 8),
-                            ],
-
-                            // ── Invite code ──
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                    color: const Color(0xFFE0E0E0), width: 1.5),
+                              Text(
+                                group.name,
+                                style: GoogleFonts.sora(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
                               ),
-                              child: Row(
+                              Text(
+                                group.contributionFrequency,
+                                style: GoogleFonts.sora(fontSize: 13, color: Colors.white60),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
                                 children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        context
-                                            .watch<LocaleProvider>()
-                                            .strings
-                                            .groupInviteCode,
-                                        style: GoogleFonts.sora(
-                                          fontSize: 10,
-                                          color: _grey,
-                                          letterSpacing: 2,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        group.inviteCode.isEmpty
-                                            ? '------'
-                                            : group.inviteCode,
-                                        style: GoogleFonts.sora(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w800,
-                                          color: _ink,
-                                          letterSpacing: 6,
-                                        ),
-                                      ),
-                                    ],
+                                  _statChip(
+                                    'RWF ${group.totalSavings.toStringAsFixed(0)}',
+                                    s.totalSavings,
                                   ),
-                                  const Spacer(),
-                                  IconButton(
-                                    onPressed: () {
-                                      Clipboard.setData(ClipboardData(
-                                          text: group.inviteCode));
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                              context
-                                                  .read<LocaleProvider>()
-                                                  .strings
-                                                  .codeCopiedMessage,
-                                              style: GoogleFonts.sora()),
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12)),
-                                          margin: const EdgeInsets.all(16),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.copy_outlined,
-                                        color: _ink),
-                                  ),
+                                  const SizedBox(width: 12),
+                                  _statChip('${group.members.length}', s.members),
                                 ],
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6, left: 4),
-                              child: Text(
-                                context
-                                    .watch<LocaleProvider>()
-                                    .strings
-                                    .shareCodeWithMembers,
-                                style: GoogleFonts.sora(
-                                    fontSize: 12, color: _grey),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── Quick Actions ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _CircleAction(
+                              icon: Icons.group_add_outlined,
+                              label: 'New Group',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
                               ),
                             ),
-
-                            const SizedBox(height: 16),
-
-                            // ── Invite member button ──
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton.icon(
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => InviteMemberScreen(
-                                      groupId: group.id,
-                                      groupName: group.name,
-                                      inviteCode: group.inviteCode,
-                                    ),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.person_add_outlined,
-                                    size: 20),
-                                label: Text(
-                                  s.inviteMember,
-                                  style: GoogleFonts.sora(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _ink,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14)),
-                                ),
+                            _CircleAction(
+                              icon: Icons.login,
+                              label: 'Join',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const JoinGroupScreen()),
                               ),
                             ),
+                            _CircleAction(
+                              icon: Icons.add_circle_outline,
+                              label: 'Add Contribution',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const AddContributionScreen()),
+                              ),
+                            ),
+                          ],
+                        ),
 
-                            const SizedBox(height: 24),
+                        const SizedBox(height: 28),
 
-                            // ── Quick actions ──
+                        // ── Active Ikimina ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
                             Text(
-                              s.quickActions,
+                              'Active Ikimina',
                               style: GoogleFonts.sora(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 color: _ink,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _ActionCard(
-                                    icon: Icons.add_card_outlined,
-                                    label: s.addContribution,
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                          builder: (_) =>
-                                              const AddContributionScreen()),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _ActionCard(
-                                    icon: Icons.people_outline,
-                                    label: s.groupMembers,
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => MembersScreen(
-                                          groupId: group.id,
-                                          groupName: group.name,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _ActionCard(
-                                    icon: Icons.bar_chart_outlined,
-                                    label: s.myContributions,
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => ContributionsScreen(
-                                            groupId: group.id),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _ActionCard(
-                                    icon: Icons.account_balance_wallet_outlined,
-                                    label: s.transactions,
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => TransactionsScreen(
-                                            groupId: group.id),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              'See all',
+                              style: GoogleFonts.sora(
+                                fontSize: 13,
+                                color: _grey,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 12),
+
+                        ...groupP.groups.map(
+                          (g) => _IkiminaCard(group: g, userId: user?.id ?? ''),
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        // ── Recent Activity ──
+                        Text(
+                          'Recent Activity',
+                          style: GoogleFonts.sora(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _ink,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        StreamBuilder<List<ContributionModel>>(
+                          stream: FirestoreService().getGroupContributions(group.id),
+                          builder: (ctx, snap) {
+                            if (snap.connectionState == ConnectionState.waiting) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: CircularProgressIndicator(color: _ink, strokeWidth: 2),
+                                ),
+                              );
+                            }
+                            final recent = (snap.data ?? []).take(5).toList();
+                            if (recent.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: Text(
+                                    'No recent activity',
+                                    style: GoogleFonts.sora(fontSize: 13, color: _grey),
+                                  ),
+                                ),
+                              );
+                            }
+                            return Column(
+                              children: recent.map((c) => _ActivityItem(contribution: c)).toList(),
+                            );
+                          },
+                        ),
+                      ],
                     ),
 
                   const SizedBox(height: 40),
@@ -617,7 +356,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ),
           ),
-          // Group tab dummy
+          // Group tab
           const Center(child: Text('Group')),
           // Wallet tab
           const WalletScreen(),
@@ -633,15 +372,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: [
+          NavigationDestination(icon: const Icon(Icons.home_outlined), label: s.home),
+          NavigationDestination(icon: const Icon(Icons.people_outline), label: s.groups),
           NavigationDestination(
-              icon: const Icon(Icons.home_outlined), label: s.home),
-          NavigationDestination(
-              icon: const Icon(Icons.people_outline), label: s.groups),
-          NavigationDestination(
-              icon: const Icon(Icons.account_balance_wallet_outlined),
-              label: s.wallet),
-          NavigationDestination(
-              icon: const Icon(Icons.person_outline), label: s.profile),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            label: s.wallet,
+          ),
+          NavigationDestination(icon: const Icon(Icons.person_outline), label: s.profile),
         ],
       ),
     );
@@ -674,12 +411,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 }
 
-class _ActionCard extends StatelessWidget {
+// ── Circle quick action button ──
+class _CircleAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
-  const _ActionCard({
+  const _CircleAction({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -689,28 +427,272 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: const Color(0xFF1A1A1A), size: 26),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.sora(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1A1A1A),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0F0F0),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: _ink, size: 26),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.sora(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Ikimina card (shared for admin & member) ──
+class _IkiminaCard extends StatelessWidget {
+  final GroupModel group;
+  final String userId;
+
+  const _IkiminaCard({required this.group, required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAdmin = group.adminId == userId;
+    final memberCount = group.members.isEmpty ? 1 : group.members.length;
+    final target = group.contributionAmount * memberCount;
+    final progress = target > 0
+        ? (group.totalSavings / target).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Name + role badge
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  group.name,
+                  style: GoogleFonts.sora(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A).withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isAdmin ? 'Admin' : 'Member',
+                  style: GoogleFonts.sora(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
+          // Ikimina type (frequency)
+          Text(
+            group.contributionFrequency,
+            style: GoogleFonts.sora(fontSize: 13, color: _grey),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: const Color(0xFFEEEEEE),
+              valueColor: const AlwaysStoppedAnimation<Color>(_ink),
+              minHeight: 7,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${(progress * 100).toInt()}% of goal',
+                style: GoogleFonts.sora(fontSize: 11, color: _grey),
+              ),
+              Text(
+                'RWF ${group.totalSavings.toStringAsFixed(0)}',
+                style: GoogleFonts.sora(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _ink,
+                ),
+              ),
+            ],
+          ),
+
+          // Invite code (only if user is admin of this group)
+          if (isAdmin && group.inviteCode.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(color: Color(0xFFEEEEEE), height: 1),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'INVITE CODE',
+                      style: GoogleFonts.sora(
+                        fontSize: 10,
+                        color: _grey,
+                        letterSpacing: 2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      group.inviteCode,
+                      style: GoogleFonts.sora(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _ink,
+                        letterSpacing: 6,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: group.inviteCode));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Code copied!', style: GoogleFonts.sora()),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        margin: const EdgeInsets.all(16),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_outlined, color: _ink, size: 20),
+                ),
+              ],
             ),
           ],
-        ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Recent activity item ──
+class _ActivityItem extends StatelessWidget {
+  final ContributionModel contribution;
+
+  const _ActivityItem({required this.contribution});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = contribution.userName;
+    final initials = name
+        .trim()
+        .split(' ')
+        .map((w) => w.isNotEmpty ? w[0] : '')
+        .take(2)
+        .join()
+        .toUpperCase();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0F0F0),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                initials,
+                style: GoogleFonts.sora(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: GoogleFonts.sora(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _ink,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'Contribution',
+                  style: GoogleFonts.sora(fontSize: 11, color: _grey),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'RWF ${contribution.amount.toStringAsFixed(0)}',
+                style: GoogleFonts.sora(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                ),
+              ),
+              Text(
+                Formatters.relativeTime(contribution.date),
+                style: GoogleFonts.sora(fontSize: 11, color: _grey),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
