@@ -11,6 +11,8 @@ import '../../providers/locale_provider.dart';
 import '../../services/firestore_service.dart';
 import '../contributions/add_contribution_screen.dart';
 import '../groups/create_group_screen.dart';
+import '../groups/group_info_screen.dart';
+import '../groups/groups_screen.dart';
 import '../groups/join_group_screen.dart';
 import '../profile/profile_screen.dart';
 import '../wallet/wallet_screen.dart';
@@ -291,12 +293,15 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                                 color: _ink,
                               ),
                             ),
-                            Text(
-                              'See all',
-                              style: GoogleFonts.sora(
-                                fontSize: 13,
-                                color: _grey,
-                                fontWeight: FontWeight.w500,
+                            GestureDetector(
+                              onTap: () => setState(() => _currentIndex = 1),
+                              child: Text(
+                                'See all',
+                                style: GoogleFonts.sora(
+                                  fontSize: 13,
+                                  color: _grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],
@@ -304,7 +309,17 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                         const SizedBox(height: 12),
 
                         ...groupP.groups.map(
-                          (g) => _IkiminaCard(group: g, userId: user?.id ?? ''),
+                          (g) => GestureDetector(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => GroupInfoScreen(
+                                  group: g,
+                                  currentUserId: user?.id ?? '',
+                                ),
+                              ),
+                            ),
+                            child: _IkiminaCard(group: g, userId: user?.id ?? ''),
+                          ),
                         ),
 
                         const SizedBox(height: 28),
@@ -360,8 +375,8 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
               ),
             ),
           ),
-          // Group tab
-          const Center(child: Text('Group')),
+          // Groups tab
+          const GroupsScreen(),
           // Wallet tab
           const WalletScreen(),
           // Profile tab
