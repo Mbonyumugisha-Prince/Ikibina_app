@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/group_model.dart';
 import '../models/contribution_model.dart';
@@ -6,24 +8,46 @@ import '../services/firestore_service.dart';
 class GroupProvider extends ChangeNotifier {
   final FirestoreService _service = FirestoreService();
 
+  StreamSubscription<List<GroupModel>>? _subscription;
+
   List<GroupModel> _groups = [];
   GroupModel? _currentGroup;
   bool _loading = false;
   String? _error;
   bool _hasAttemptedLoad = false;
+  String? _loadedUserId;
 
   List<GroupModel> get groups => _groups;
   GroupModel? get currentGroup => _currentGroup;
   bool get loading => _loading;
   String? get error => _error;
   bool get hasAttemptedLoad => _hasAttemptedLoad;
+  String? get loadedUserId => _loadedUserId;
+
+  /// Clears all state and cancels the active stream. Call this on logout.
+  void reset() {
+    _subscription?.cancel();
+    _subscription = null;
+    _groups = [];
+    _currentGroup = null;
+    _loading = false;
+    _error = null;
+    _hasAttemptedLoad = false;
+    _loadedUserId = null;
+    notifyListeners();
+  }
 
   void loadUserGroups(String userId) {
+    // Cancel the previous subscription so the old user's data stops arriving.
+    _subscription?.cancel();
+    _subscription = null;
+
     _setLoading(true);
     _error = null;
     _hasAttemptedLoad = false;
-    
-    _service.getUserGroups(userId).listen(
+    _loadedUserId = userId;
+
+    _subscription = _service.getUserGroups(userId).listen(
       (groups) {
         _groups = groups;
         if (groups.isEmpty) {
@@ -31,7 +55,6 @@ class GroupProvider extends ChangeNotifier {
         } else if (_currentGroup == null) {
           _currentGroup = groups.first;
         } else {
-          // Always sync currentGroup with latest Firestore data
           _currentGroup = groups.firstWhere(
             (g) => g.id == _currentGroup!.id,
             orElse: () => groups.first,
@@ -47,11 +70,11 @@ class GroupProvider extends ChangeNotifier {
         _setLoading(false);
       },
     );
-    
+
     // Timeout after 10 seconds if no data received
     Future.delayed(const Duration(seconds: 10), () {
       if (!_hasAttemptedLoad && _loading) {
-        _error = 'Failed to connect to groups. Check your internet connection.';
+        _error = 'Failed to connect. Check your internet connection.';
         _setLoading(false);
         _hasAttemptedLoad = true;
       }
@@ -99,6 +122,12 @@ class GroupProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   void _setLoading(bool value) {

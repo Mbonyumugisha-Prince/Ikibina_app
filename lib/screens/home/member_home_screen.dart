@@ -143,7 +143,9 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
     final group = groupP.currentGroup;
     final user = auth.user;
 
-    if (user != null && !groupP.hasAttemptedLoad && !groupP.loading) {
+    if (user != null &&
+        (!groupP.hasAttemptedLoad || groupP.loadedUserId != user.id) &&
+        !groupP.loading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<GroupProvider>().loadUserGroups(user.id);
       });

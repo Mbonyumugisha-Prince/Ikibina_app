@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../language/language_selection_screen.dart';
 import '../auth/login_screen.dart';
@@ -319,8 +320,8 @@ class ProfileScreen extends StatelessWidget {
             Center(
               child: TextButton.icon(
                 onPressed: () {
+                  context.read<GroupProvider>().reset();
                   auth.signOut();
-                  // Depending on auth flow it could redirect automatically or we push login
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                     (_) => false,
