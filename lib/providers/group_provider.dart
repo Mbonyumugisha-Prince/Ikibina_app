@@ -26,8 +26,16 @@ class GroupProvider extends ChangeNotifier {
     _service.getUserGroups(userId).listen(
       (groups) {
         _groups = groups;
-        if (groups.isNotEmpty && _currentGroup == null) {
+        if (groups.isEmpty) {
+          _currentGroup = null;
+        } else if (_currentGroup == null) {
           _currentGroup = groups.first;
+        } else {
+          // Always sync currentGroup with latest Firestore data
+          _currentGroup = groups.firstWhere(
+            (g) => g.id == _currentGroup!.id,
+            orElse: () => groups.first,
+          );
         }
         _hasAttemptedLoad = true;
         _setLoading(false);
