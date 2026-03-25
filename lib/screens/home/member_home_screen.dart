@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,7 +11,6 @@ import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/firestore_service.dart';
-import '../contributions/add_contribution_screen.dart';
 import '../groups/create_group_screen.dart';
 import '../groups/group_info_screen.dart';
 import '../groups/groups_screen.dart';
@@ -32,9 +33,27 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
   int _cardPage = 0;
   int _activityGroupIndex = 0;
   final PageController _pageController = PageController();
+  Timer? _autoScrollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final groups = context.read<GroupProvider>().groups;
+      if (groups.length <= 1) return;
+      final next = (_cardPage + 1) % groups.length;
+      _pageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
 
   @override
   void dispose() {
+    _autoScrollTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -344,9 +363,7 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                             _CircleAction(
                               icon: Icons.add_circle_outline,
                               label: 'Add Contribution',
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const AddContributionScreen()),
-                              ),
+                              onTap: () => setState(() => _currentIndex = 2),
                             ),
                           ],
                         ),
@@ -380,7 +397,7 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        ...groupP.groups.map(
+                        ...groupP.groups.take(3).map(
                           (g) => GestureDetector(
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
