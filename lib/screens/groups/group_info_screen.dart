@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/group_model.dart';
 import '../../models/user_model.dart';
+import 'member_detail_screen.dart';
 
 const _bg = Color(0xFFF5F5F5);
 const _ink = Color(0xFF1A1A1A);
@@ -354,6 +355,9 @@ class _MembersTab extends StatelessWidget {
                 }
                 regularMembers.sort((a, b) => a.name.compareTo(b.name));
 
+                final isViewerAdmin = currentUserId == group.adminId;
+                final suspendedIds = Set<String>.from(group.suspendedMembers);
+
                 return ListView(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 4),
@@ -377,6 +381,7 @@ class _MembersTab extends StatelessWidget {
                           streak: streakMap[adminUser.id] ?? 0,
                           isAdmin: true,
                           hasLoanRequest: loanUserIds.contains(adminUser.id),
+                          isSuspended: suspendedIds.contains(adminUser.id),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -400,6 +405,17 @@ class _MembersTab extends StatelessWidget {
                           streak: streakMap[m.id] ?? 0,
                           isAdmin: false,
                           hasLoanRequest: loanUserIds.contains(m.id),
+                          isSuspended: suspendedIds.contains(m.id),
+                          onTap: isViewerAdmin
+                              ? () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => MemberDetailScreen(
+                                        group: group,
+                                        member: m,
+                                      ),
+                                    ),
+                                  )
+                              : null,
                         ),
                       ),
                     ),
@@ -420,12 +436,16 @@ class _MemberTile extends StatelessWidget {
   final int streak;
   final bool isAdmin;
   final bool hasLoanRequest;
+  final bool isSuspended;
+  final VoidCallback? onTap;
 
   const _MemberTile({
     required this.member,
     required this.streak,
     required this.isAdmin,
     required this.hasLoanRequest,
+    this.isSuspended = false,
+    this.onTap,
   });
 
   @override
@@ -438,7 +458,9 @@ class _MemberTile extends StatelessWidget {
         .join()
         .toUpperCase();
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -484,7 +506,25 @@ class _MemberTile extends StatelessWidget {
                   'Streak: $streak Contributions',
                   style: GoogleFonts.sora(fontSize: 11, color: _grey),
                 ),
-                if (hasLoanRequest) ...[
+                if (isSuspended) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Suspended',
+                      style: GoogleFonts.sora(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ] else if (hasLoanRequest) ...[
                   const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -523,6 +563,7 @@ class _MemberTile extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
