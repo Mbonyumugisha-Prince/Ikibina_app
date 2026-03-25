@@ -15,6 +15,7 @@ import '../groups/invite_member_screen.dart';
 import '../groups/members_screen.dart';
 import '../transactions/transactions_screen.dart';
 import '../profile/profile_screen.dart';
+import '../wallet/wallet_screen.dart';
 
 const _bg = Color(0xFFF5F5F5);
 const _ink = Color(0xFF1A1A1A);
@@ -618,8 +619,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ),
           // Group tab dummy
           const Center(child: Text('Group')),
-          // Wallet tab dummy
-          const Center(child: Text('Wallet')),
+          // Wallet tab
+          const WalletScreen(),
           // Profile tab
           const ProfileScreen(),
         ],
