@@ -204,6 +204,7 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                       children: [
                         // ── Group overview card ──
                         Container(
+                          width: double.infinity,
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: _ink,
@@ -235,15 +236,29 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                                 style: GoogleFonts.sora(fontSize: 13, color: Colors.white60),
                               ),
                               const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  _statChip(
-                                    'RWF ${group.totalSavings.toStringAsFixed(0)}',
-                                    s.groupTotal,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  _statChip('${group.members.length}', s.members),
-                                ],
+                              StreamBuilder<List<ContributionModel>>(
+                                stream: FirestoreService()
+                                    .getGroupContributions(group.id),
+                                builder: (ctx, snap) {
+                                  final myTotal = (snap.data ?? [])
+                                      .where((c) => c.userId == (user?.id ?? ''))
+                                      .fold(0.0, (sum, c) => sum + c.amount);
+                                  return Row(
+                                    children: [
+                                      Expanded(child: _statChip(
+                                        'RWF ${group.totalSavings.toStringAsFixed(0)}',
+                                        s.groupTotal,
+                                      )),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: _statChip('${group.members.length}', s.members)),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: _statChip(
+                                        'RWF ${myTotal.toStringAsFixed(0)}',
+                                        'Your Savings',
+                                      )),
+                                    ],
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -405,24 +420,32 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
 
   Widget _statChip(String value, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             value,
             style: GoogleFonts.sora(
-              fontSize: 15,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
-            style: GoogleFonts.sora(fontSize: 11, color: Colors.white60),
+            style: GoogleFonts.sora(fontSize: 9, color: Colors.white60),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
