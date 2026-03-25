@@ -29,6 +29,92 @@ class MemberHomeScreen extends StatefulWidget {
 
 class _MemberHomeScreenState extends State<MemberHomeScreen> {
   int _currentIndex = 0;
+  int _cardPage = 0;
+  int _activityGroupIndex = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _showActivityFilter(BuildContext context, List<GroupModel> groups) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDDDDDD),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Filter Activity',
+                style: GoogleFonts.sora(
+                    fontSize: 15, fontWeight: FontWeight.w700, color: _ink),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...groups.asMap().entries.map((e) {
+            final initials = e.value.name
+                .trim()
+                .split(' ')
+                .map((w) => w.isNotEmpty ? w[0] : '')
+                .take(2)
+                .join()
+                .toUpperCase();
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+              leading: Container(
+                width: 36,
+                height: 36,
+                decoration:
+                    const BoxDecoration(color: _ink, shape: BoxShape.circle),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: GoogleFonts.sora(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white),
+                  ),
+                ),
+              ),
+              title: Text(
+                e.value.name,
+                style: GoogleFonts.sora(
+                    fontSize: 14, fontWeight: FontWeight.w600, color: _ink),
+              ),
+              trailing: _activityGroupIndex == e.key
+                  ? const Icon(Icons.check_circle, color: _ink, size: 20)
+                  : null,
+              onTap: () {
+                setState(() => _activityGroupIndex = e.key);
+                Navigator.of(context).pop();
+              },
+            );
+          }),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,67 +288,38 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Group overview card ──
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: _ink,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                s.yourGroup,
-                                style: GoogleFonts.sora(
-                                  fontSize: 10,
-                                  color: Colors.white60,
-                                  letterSpacing: 2,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                group.name,
-                                style: GoogleFonts.sora(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                '${group.contributionFrequency} · RWF ${group.contributionAmount.toStringAsFixed(0)} ${s.perCycle}',
-                                style: GoogleFonts.sora(fontSize: 13, color: Colors.white60),
-                              ),
-                              const SizedBox(height: 16),
-                              StreamBuilder<List<ContributionModel>>(
-                                stream: FirestoreService()
-                                    .getGroupContributions(group.id),
-                                builder: (ctx, snap) {
-                                  final myTotal = (snap.data ?? [])
-                                      .where((c) => c.userId == (user?.id ?? ''))
-                                      .fold(0.0, (sum, c) => sum + c.amount);
-                                  return Row(
-                                    children: [
-                                      Expanded(child: _statChip(
-                                        'RWF ${group.totalSavings.toStringAsFixed(0)}',
-                                        s.groupTotal,
-                                      )),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: _statChip('${group.members.length}', s.members)),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: _statChip(
-                                        'RWF ${myTotal.toStringAsFixed(0)}',
-                                        'Your Savings',
-                                      )),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
+                        // ── Group cards carousel ──
+                        SizedBox(
+                          height: 190,
+                          child: PageView.builder(
+                            controller: _pageController,
+                            onPageChanged: (i) => setState(() => _cardPage = i),
+                            itemCount: groupP.groups.length,
+                            itemBuilder: (ctx, i) => _DashCard(
+                              group: groupP.groups[i],
+                              userId: user?.id ?? '',
+                            ),
                           ),
                         ),
+                        if (groupP.groups.length > 1) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              groupP.groups.length,
+                              (i) => AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                margin: const EdgeInsets.symmetric(horizontal: 3),
+                                width: _cardPage == i ? 20 : 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: _cardPage == i ? _ink : const Color(0xFFCCCCCC),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(height: 20),
 
@@ -340,18 +397,45 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                         const SizedBox(height: 28),
 
                         // ── Recent Activity ──
-                        Text(
-                          'Recent Activity',
-                          style: GoogleFonts.sora(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: _ink,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Recent Activity',
+                              style: GoogleFonts.sora(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: _ink,
+                              ),
+                            ),
+                            if (groupP.groups.length > 1)
+                              GestureDetector(
+                                onTap: () => _showActivityFilter(context, groupP.groups),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 100),
+                                      child: Text(
+                                        groupP.groups[_activityGroupIndex.clamp(0, groupP.groups.length - 1)].name,
+                                        style: GoogleFonts.sora(fontSize: 12, color: _grey, fontWeight: FontWeight.w500),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.tune, color: _grey, size: 16),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 12),
 
                         StreamBuilder<List<ContributionModel>>(
-                          stream: FirestoreService().getGroupContributions(group.id),
+                          stream: FirestoreService().getGroupContributions(
+                            groupP.groups[_activityGroupIndex.clamp(0, groupP.groups.length - 1)].id,
+                          ),
                           builder: (ctx, snap) {
                             if (snap.connectionState == ConnectionState.waiting) {
                               return const Padding(
@@ -361,11 +445,11 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
                                 ),
                               );
                             }
-                            // Show only this user's recent contributions
-                            final recent = (snap.data ?? [])
-                                .where((c) => c.userId == user?.id)
-                                .take(5)
-                                .toList();
+                            final activityGroup = groupP.groups[_activityGroupIndex.clamp(0, groupP.groups.length - 1)];
+                            final isAdminOfActivityGroup = activityGroup.adminId == user?.id;
+                            final recent = isAdminOfActivityGroup
+                                ? (snap.data ?? []).take(5).toList()
+                                : (snap.data ?? []).where((c) => c.userId == user?.id).take(5).toList();
                             if (recent.isEmpty) {
                               return Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 24),
@@ -418,7 +502,78 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
     );
   }
 
-  Widget _statChip(String value, String label) {
+}
+
+// ── Dashboard group card (carousel page) ──
+class _DashCard extends StatelessWidget {
+  final GroupModel group;
+  final String userId;
+
+  const _DashCard({required this.group, required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.read<LocaleProvider>().strings;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _ink,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            s.yourGroup,
+            style: GoogleFonts.sora(
+              fontSize: 10,
+              color: Colors.white60,
+              letterSpacing: 2,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            group.name,
+            style: GoogleFonts.sora(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            '${group.contributionFrequency} · RWF ${group.contributionAmount.toStringAsFixed(0)} ${s.perCycle}',
+            style: GoogleFonts.sora(fontSize: 12, color: Colors.white60),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 14),
+          StreamBuilder<List<ContributionModel>>(
+            stream: FirestoreService().getGroupContributions(group.id),
+            builder: (ctx, snap) {
+              final myTotal = (snap.data ?? [])
+                  .where((c) => c.userId == userId)
+                  .fold(0.0, (sum, c) => sum + c.amount);
+              return Row(
+                children: [
+                  Expanded(child: _chip('RWF ${group.totalSavings.toStringAsFixed(0)}', s.groupTotal)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _chip('${group.members.length}', s.members)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _chip('RWF ${myTotal.toStringAsFixed(0)}', 'Your Savings')),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String value, String label) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
