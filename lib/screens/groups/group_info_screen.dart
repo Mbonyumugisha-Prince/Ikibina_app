@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,10 +31,17 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
   int _tabIndex = 0;
   String _search = '';
   final TextEditingController _searchCtrl = TextEditingController();
+  late GroupModel _group;
 
-  bool get _isAdmin => widget.group.adminId == widget.currentUserId;
+  @override
+  void initState() {
+    super.initState();
+    _group = widget.group;
+  }
 
-  bool get _isGoalGroup => widget.group.groupType == 'goal';
+  bool get _isAdmin => _group.adminId == widget.currentUserId;
+
+  bool get _isGoalGroup => _group.groupType == 'goal';
 
   List<String> get _tabs {
     if (_isGoalGroup) {
@@ -58,22 +66,22 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     switch (tab) {
       case 'Members':
         return _MembersTab(
-          group: widget.group,
+          group: _group,
           currentUserId: widget.currentUserId,
           search: _search,
         );
       case 'Late Payments':
-        return _LatePaymentsTab(group: widget.group);
+        return _LatePaymentsTab(group: _group);
       case 'Loan Request':
-        return _LoanRequestTab(group: widget.group);
+        return _LoanRequestTab(group: _group);
       case 'Leaderboard':
-        return _LeaderboardTab(group: widget.group);
+        return _LeaderboardTab(group: _group);
       case 'Milestones':
-        return _MilestonesTab(group: widget.group);
+        return _MilestonesTab(group: _group);
       case 'Info':
-        return _InfoTab(group: widget.group, isAdmin: _isAdmin);
+        return _InfoTab(group: _group, isAdmin: _isAdmin);
       case 'Contributions':
-        return _ContributionsTab(group: widget.group);
+        return _ContributionsTab(group: _group);
       default:
         return const SizedBox();
     }
@@ -81,7 +89,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final group = widget.group;
+    final group = _group;
     final initials = group.name
         .trim()
         .split(' ')
@@ -113,13 +121,23 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               tooltip: 'Edit group',
               icon: const Icon(Icons.edit_outlined, color: _ink),
               onPressed: () async {
+                final oldImageUrl = _group.imageUrl;
                 final updated = await Navigator.of(context).push<GroupModel>(
                   MaterialPageRoute(
-                    builder: (_) => EditGroupScreen(group: group),
+                    builder: (_) => EditGroupScreen(group: _group),
                   ),
                 );
-                // Rebuild with latest data if something changed
-                if (updated != null && mounted) setState(() {});
+                if (updated != null && mounted) {
+                  // Evict old image from cache so the new one is fetched fresh
+                  if (oldImageUrl != null && oldImageUrl != updated.imageUrl) {
+                    // Evict from disk cache (CachedNetworkImage)
+                    await CachedNetworkImage.evictFromCache(oldImageUrl);
+                    // Evict from Flutter's in-memory image cache
+                    imageCache.evict(NetworkImage(oldImageUrl));
+                    imageCache.clearLiveImages();
+                  }
+                  setState(() => _group = updated);
+                }
               },
             ),
             Padding(
@@ -149,23 +167,52 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Column(
               children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: const BoxDecoration(
-                    color: _ink,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      initials,
-                      style: GoogleFonts.sora(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+                // Avatar: photo if available, otherwise initials
+                ClipOval(
+                  child: group.imageUrl != null && group.imageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          key: ValueKey(group.imageUrl),
+                          imageUrl: group.imageUrl!,
+                          width: 88,
+                          height: 88,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            width: 88,
+                            height: 88,
+                            color: _ink,
+                            child: Center(
+                              child: Text(initials,
+                                  style: GoogleFonts.sora(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white)),
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            width: 88,
+                            height: 88,
+                            color: _ink,
+                            child: Center(
+                              child: Text(initials,
+                                  style: GoogleFonts.sora(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white)),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 88,
+                          height: 88,
+                          color: _ink,
+                          child: Center(
+                            child: Text(initials,
+                                style: GoogleFonts.sora(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white)),
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -180,11 +227,21 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _PillBadge(text: group.contributionFrequency),
-                    const SizedBox(width: 8),
-                    _PillBadge(
-                      text: 'RWF ${group.contributionAmount.toStringAsFixed(0)}/cycle',
-                    ),
+                    if (_isGoalGroup) ...[
+                      _PillBadge(text: 'Goal Group'),
+                      const SizedBox(width: 8),
+                      _PillBadge(
+                          text:
+                              'RWF ${group.goalAmount.toStringAsFixed(0)} goal'),
+                    ] else ...[
+                      if (group.contributionFrequency.isNotEmpty)
+                        _PillBadge(text: group.contributionFrequency),
+                      const SizedBox(width: 8),
+                      _PillBadge(
+                        text:
+                            'RWF ${group.contributionAmount.toStringAsFixed(0)}/cycle',
+                      ),
+                    ],
                   ],
                 ),
               ],

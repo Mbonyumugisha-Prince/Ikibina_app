@@ -40,6 +40,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     super.initState();
     _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
+      if (!_pageController.hasClients) return;
       final groups = context.read<GroupProvider>().groups;
       if (groups.length <= 1) return;
       final next = (_cardPage + 1) % groups.length;
