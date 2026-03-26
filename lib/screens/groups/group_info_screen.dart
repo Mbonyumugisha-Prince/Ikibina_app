@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/group_model.dart';
 import '../../models/user_model.dart';
+import 'edit_group_screen.dart';
+import 'invite_member_screen.dart';
 import 'member_detail_screen.dart';
 
 const _bg = Color(0xFFF5F5F5);
@@ -31,11 +33,18 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
 
   bool get _isAdmin => widget.group.adminId == widget.currentUserId;
 
+  bool get _isGoalGroup => widget.group.groupType == 'goal';
+
   List<String> get _tabs {
-    if (_isAdmin) {
-      return ['Members', 'Late Payments', 'Loan Request', 'Info', 'Contributions'];
+    if (_isGoalGroup) {
+      // Goal groups get Leaderboard + Milestones instead of Late Payments/Loan
+      return _isAdmin
+          ? ['Members', 'Leaderboard', 'Milestones', 'Info', 'Contributions']
+          : ['Members', 'Leaderboard', 'Milestones', 'Info'];
     }
-    return ['Members', 'Loan Request', 'Info'];
+    return _isAdmin
+        ? ['Members', 'Late Payments', 'Loan Request', 'Info', 'Contributions']
+        : ['Members', 'Loan Request', 'Info'];
   }
 
   @override
@@ -57,6 +66,10 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         return _LatePaymentsTab(group: widget.group);
       case 'Loan Request':
         return _LoanRequestTab(group: widget.group);
+      case 'Leaderboard':
+        return _LeaderboardTab(group: widget.group);
+      case 'Milestones':
+        return _MilestonesTab(group: widget.group);
       case 'Info':
         return _InfoTab(group: widget.group, isAdmin: _isAdmin);
       case 'Contributions':
@@ -94,6 +107,39 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
             color: _ink,
           ),
         ),
+        actions: [
+          if (_isAdmin) ...[
+            IconButton(
+              tooltip: 'Edit group',
+              icon: const Icon(Icons.edit_outlined, color: _ink),
+              onPressed: () async {
+                final updated = await Navigator.of(context).push<GroupModel>(
+                  MaterialPageRoute(
+                    builder: (_) => EditGroupScreen(group: group),
+                  ),
+                );
+                // Rebuild with latest data if something changed
+                if (updated != null && mounted) setState(() {});
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                tooltip: 'Invite member',
+                icon: const Icon(Icons.person_add_alt_1_outlined, color: _ink),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => InviteMemberScreen(
+                      groupId:    group.id,
+                      groupName:  group.name,
+                      inviteCode: group.inviteCode,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
       body: Column(
         children: [
@@ -996,6 +1042,421 @@ class _InfoTab extends StatelessWidget {
           _infoCard('Created', Formatters.date(group.createdAt)),
           if (isAdmin) _infoCard('Invite Code', group.inviteCode, isCode: true),
         ],
+      ),
+    );
+  }
+}
+
+// ── Leaderboard Tab (goal groups) ──
+class _LeaderboardTab extends StatelessWidget {
+  final GroupModel group;
+  const _LeaderboardTab({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('contributions')
+          .where('groupId', isEqualTo: group.id)
+          .snapshots(),
+      builder: (ctx, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: _ink));
+        }
+
+        // Aggregate total contributions per user
+        final totals = <String, double>{};
+        final names  = <String, String>{};
+        for (final doc in snap.data?.docs ?? []) {
+          final data   = doc.data() as Map<String, dynamic>;
+          final uid    = data['userId']   as String? ?? '';
+          final name   = data['userName'] as String? ?? '';
+          final amount = (data['amount']  ?? 0).toDouble();
+          if (uid.isEmpty) continue;
+          totals[uid] = (totals[uid] ?? 0) + amount;
+          names[uid]  = name;
+        }
+
+        final ranked = totals.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+
+        if (ranked.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.leaderboard_outlined, size: 64, color: _grey),
+                const SizedBox(height: 12),
+                Text('No contributions yet.',
+                    style: GoogleFonts.sora(fontSize: 14, color: _grey)),
+              ],
+            ),
+          );
+        }
+
+        final medals = ['🥇', '🥈', '🥉'];
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          itemCount: ranked.length,
+          itemBuilder: (_, i) {
+            final entry = ranked[i];
+            final name  = names[entry.key] ?? 'Unknown';
+            final initials = name.trim().split(' ')
+                .map((w) => w.isNotEmpty ? w[0] : '')
+                .take(2).join().toUpperCase();
+            final isTop3 = i < 3;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: i == 0
+                    ? const Color(0xFFFFFDE7)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: i == 0
+                      ? const Color(0xFFFFD54F)
+                      : const Color(0xFFE0E0E0),
+                ),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 32,
+                    child: Text(
+                      isTop3 ? medals[i] : '${i + 1}',
+                      style: GoogleFonts.sora(
+                          fontSize: isTop3 ? 22 : 14,
+                          fontWeight: FontWeight.w700,
+                          color: _grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: i == 0 ? const Color(0xFFFFD54F) : const Color(0xFFF0F0F0),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(initials,
+                          style: GoogleFonts.sora(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _ink)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(name,
+                        style: GoogleFonts.sora(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _ink),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  Text(
+                    'RWF ${entry.value.toStringAsFixed(0)}',
+                    style: GoogleFonts.sora(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _ink),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// ── Milestones Tab (goal groups) ──
+class _MilestonesTab extends StatelessWidget {
+  final GroupModel group;
+  const _MilestonesTab({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    final milestones = group.milestones;
+
+    if (milestones.isEmpty) {
+      return Center(
+        child: Text('No milestones set.',
+            style: GoogleFonts.sora(fontSize: 14, color: _grey)),
+      );
+    }
+
+    // Build cumulative targets so we know which milestone is current/done
+    final cumulativeTargets = <double>[];
+    double acc = 0;
+    for (final m in milestones) {
+      acc += m.targetAmount;
+      cumulativeTargets.add(acc);
+    }
+    final saved = group.totalSavings;
+    final goalAmount = cumulativeTargets.last;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Overall progress header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _ink,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total Goal',
+                        style: GoogleFonts.sora(
+                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.7))),
+                    Text('RWF ${goalAmount.toStringAsFixed(0)}',
+                        style: GoogleFonts.sora(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Saved so far',
+                        style: GoogleFonts.sora(
+                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.7))),
+                    Text('RWF ${saved.toStringAsFixed(0)}',
+                        style: GoogleFonts.sora(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: goalAmount > 0
+                        ? (saved / goalAmount).clamp(0.0, 1.0)
+                        : 0,
+                    minHeight: 8,
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          Text('Milestones',
+              style: GoogleFonts.sora(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _ink)),
+          const SizedBox(height: 12),
+
+          // Milestone list with connecting line
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+            ),
+            child: Column(
+              children: List.generate(milestones.length, (i) {
+                final m              = milestones[i];
+                final cumTarget      = cumulativeTargets[i];
+                final prevTarget     = i == 0 ? 0.0 : cumulativeTargets[i - 1];
+                final isCompleted    = saved >= cumTarget;
+                final isCurrent      = !isCompleted && saved >= prevTarget;
+                final remaining      = (cumTarget - saved).clamp(0.0, double.infinity);
+                final milestoneProgress = isCurrent && m.targetAmount > 0
+                    ? ((saved - prevTarget) / m.targetAmount).clamp(0.0, 1.0)
+                    : (isCompleted ? 1.0 : 0.0);
+
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Icon + connecting line column
+                      SizedBox(
+                        width: 36,
+                        child: Column(
+                          children: [
+                            _MilestoneIcon(
+                                completed: isCompleted, current: isCurrent),
+                            if (i < milestones.length - 1)
+                              Expanded(
+                                child: Container(
+                                  width: 2,
+                                  margin: const EdgeInsets.symmetric(
+                                      vertical: 4),
+                                  color: isCompleted
+                                      ? _ink
+                                      : const Color(0xFFE0E0E0),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Content
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                              bottom: i < milestones.length - 1 ? 20 : 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      m.name,
+                                      style: GoogleFonts.sora(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: _ink,
+                                        decoration: isCompleted
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        decorationColor: _grey,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isCurrent)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: _ink,
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                      ),
+                                      child: Text('CURRENT',
+                                          style: GoogleFonts.sora(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              if (isCompleted)
+                                Text('Completed',
+                                    style: GoogleFonts.sora(
+                                        fontSize: 12, color: _grey))
+                              else if (isCurrent)
+                                Text(
+                                  'RWF ${remaining.toStringAsFixed(0)} remaining',
+                                  style: GoogleFonts.sora(
+                                      fontSize: 12, color: _grey),
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    const Icon(Icons.lock_outline,
+                                        size: 12, color: _grey),
+                                    const SizedBox(width: 4),
+                                    Text('Locked',
+                                        style: GoogleFonts.sora(
+                                            fontSize: 12, color: _grey)),
+                                  ],
+                                ),
+                              if (isCurrent) ...[
+                                const SizedBox(height: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: milestoneProgress,
+                                    minHeight: 6,
+                                    backgroundColor:
+                                        const Color(0xFFEEEEEE),
+                                    valueColor:
+                                        const AlwaysStoppedAnimation<Color>(
+                                            _ink),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestoneIcon extends StatelessWidget {
+  final bool completed;
+  final bool current;
+  const _MilestoneIcon({required this.completed, required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    if (completed) {
+      return Container(
+        width: 28,
+        height: 28,
+        decoration: const BoxDecoration(
+          color: _ink,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.check, color: Colors.white, size: 16),
+      );
+    }
+    if (current) {
+      return Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: _ink, width: 2.5),
+        ),
+        child: Center(
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(
+              color: _ink,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      );
+    }
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFCCCCCC), width: 1.5),
       ),
     );
   }
