@@ -6,6 +6,7 @@ import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../language/language_selection_screen.dart';
 import '../auth/login_screen.dart';
+import 'kyc_verification_screen.dart';
 import 'profile_information_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -243,6 +244,13 @@ class ProfileScreen extends StatelessWidget {
                 subtitleColor: user.emailVerified ? Colors.green : Colors.red,
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.black54),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const KycVerificationScreen(),
+                    ),
+                  );
+                },
                 showDivider: false,
               ),
             ]),
