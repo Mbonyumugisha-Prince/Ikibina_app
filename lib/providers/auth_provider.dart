@@ -180,6 +180,22 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updatePhotoUrl(String photoUrl) async {
+    _setLoading(true);
+    try {
+      await _authService.updatePhotoUrl(photoUrl);
+      _user = await _authService.getCurrentUserProfile();
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   void _setLoading(bool value) {
     _loading = value;
     notifyListeners();

@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/group_model.dart';
+import '../../models/loan_model.dart';
 import '../../models/user_model.dart';
+import '../../services/firestore_service.dart';
+import '../loans/pay_loan_screen.dart';
+import '../loans/request_loan_screen.dart';
 import 'edit_group_screen.dart';
 import 'invite_member_screen.dart';
 import 'member_detail_screen.dart';
@@ -73,7 +77,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       case 'Late Payments':
         return _LatePaymentsTab(group: _group);
       case 'Loan Request':
-        return _LoanRequestTab(group: _group);
+        return _LoanRequestTab(group: _group, currentUserId: widget.currentUserId);
       case 'Leaderboard':
         return _LeaderboardTab(group: _group);
       case 'Milestones':
@@ -855,174 +859,589 @@ class _LatePaymentsTab extends StatelessWidget {
   }
 }
 
-// ── Loan Request Tab ──
+// ── Loan Request Tab ──────────────────────────────────────────────
 class _LoanRequestTab extends StatelessWidget {
   final GroupModel group;
+  final String currentUserId;
 
-  const _LoanRequestTab({required this.group});
+  const _LoanRequestTab({required this.group, required this.currentUserId});
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('transactions')
-          .where('groupId', isEqualTo: group.id)
-          .where('type', isEqualTo: 'loan')
-          .snapshots(),
+    return StreamBuilder<List<LoanModel>>(
+      stream: FirestoreService().getGroupLoans(group.id),
       builder: (ctx, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: _ink));
         }
 
-        final docs = snap.data?.docs ?? [];
+        final loans = snap.data ?? [];
+        final myLoans     = loans.where((l) => l.userId == currentUserId).toList();
+        final activeMyLoan  = myLoans.where((l) => l.status == 'approved').toList();
+        final myPending     = myLoans.where((l) => l.status == 'pending').toList();
+        final pendingOthers = loans
+            .where((l) => l.userId != currentUserId && l.status == 'pending')
+            .toList();
+        final history = loans
+            .where((l) => l.status == 'completed' || l.status == 'rejected')
+            .toList();
 
-        // Sort in Dart by date descending
-        final sorted = [...docs];
-        sorted.sort((a, b) {
-          final aData = a.data() as Map<String, dynamic>;
-          final bData = b.data() as Map<String, dynamic>;
-          DateTime? aDate;
-          DateTime? bDate;
-          final aRaw = aData['date'];
-          final bRaw = bData['date'];
-          if (aRaw is Timestamp) aDate = aRaw.toDate();
-          if (bRaw is Timestamp) bDate = bRaw.toDate();
-          if (aDate == null && bDate == null) return 0;
-          if (aDate == null) return 1;
-          if (bDate == null) return -1;
-          return bDate.compareTo(aDate);
-        });
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            // Request button — only if no active or pending loan
+            if (activeMyLoan.isEmpty && myPending.isEmpty) ...[
+              _RequestLoanButton(group: group),
+              const SizedBox(height: 20),
+            ],
 
-        if (sorted.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.request_page_outlined, size: 64, color: _grey),
-                const SizedBox(height: 12),
-                Text(
-                  'No loan requests',
-                  style: GoogleFonts.sora(fontSize: 14, color: _grey),
+            // My pending request (with cancel option)
+            if (myPending.isNotEmpty) ...[
+              _sectionLabel('Your Pending Request'),
+              const SizedBox(height: 8),
+              ...myPending.map((l) => _PendingLoanCard(
+                    loan: l,
+                    currentUserId: currentUserId,
+                    memberCount: group.members.length,
+                    showVote: false,
+                    onCancel: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: ctx,
+                        builder: (dCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                          title: Text('Cancel Request',
+                              style: GoogleFonts.sora(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: _ink)),
+                          content: Text(
+                            'Cancel your loan request of RWF ${l.amount.toStringAsFixed(0)}?',
+                            style: GoogleFonts.sora(
+                                fontSize: 13, color: _grey, height: 1.5),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(dCtx).pop(false),
+                              child: Text('Keep',
+                                  style: GoogleFonts.sora(
+                                      color: _grey,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(dCtx).pop(true),
+                              child: Text('Cancel Request',
+                                  style: GoogleFonts.sora(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.w700)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await FirestoreService().cancelLoan(l.id);
+                      }
+                    },
+                  )),
+              const SizedBox(height: 20),
+            ],
+
+            // My active loan being repaid
+            if (activeMyLoan.isNotEmpty) ...[
+              _sectionLabel('Your Active Loan'),
+              const SizedBox(height: 8),
+              ...activeMyLoan.map((l) => _ActiveLoanCard(
+                    loan: l,
+                    onPay: () => Navigator.of(ctx).push(MaterialPageRoute(
+                      builder: (_) => PayLoanScreen(loan: l),
+                    )),
+                  )),
+              const SizedBox(height: 20),
+            ],
+
+            // Others' pending loans — everyone votes
+            if (pendingOthers.isNotEmpty) ...[
+              _sectionLabel('Pending Approvals'),
+              const SizedBox(height: 8),
+              ...pendingOthers.map((l) => _PendingLoanCard(
+                    loan: l,
+                    currentUserId: currentUserId,
+                    memberCount: group.members.length,
+                    showVote: true,
+                  )),
+              const SizedBox(height: 20),
+            ],
+
+            // History
+            if (history.isNotEmpty) ...[
+              _sectionLabel('History'),
+              const SizedBox(height: 8),
+              ...history.map((l) => _HistoryLoanCard(loan: l)),
+            ],
+
+            // Empty state
+            if (loans.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.account_balance_outlined,
+                          size: 64, color: _grey),
+                      const SizedBox(height: 12),
+                      Text('No loans yet',
+                          style: GoogleFonts.sora(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _ink)),
+                      const SizedBox(height: 6),
+                      Text('Tap "Request a Loan" to get started',
+                          style: GoogleFonts.sora(
+                              fontSize: 12, color: _grey)),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          itemCount: sorted.length,
-          itemBuilder: (_, i) {
-            final data = sorted[i].data() as Map<String, dynamic>;
-            final userName = data['userName'] as String? ?? '';
-            final amount = (data['amount'] ?? 0).toDouble();
-            DateTime? date;
-            final raw = data['date'];
-            if (raw is Timestamp) date = raw.toDate();
-
-            final initials = userName
-                .trim()
-                .split(' ')
-                .map((w) => w.isNotEmpty ? w[0] : '')
-                .take(2)
-                .join()
-                .toUpperCase();
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE0E0E0)),
               ),
-              child: Row(
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: GoogleFonts.sora(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: _grey,
+            letterSpacing: 0.5),
+      );
+}
+
+// ── Request loan button ──────────────────────────────────────────
+class _RequestLoanButton extends StatelessWidget {
+  final GroupModel group;
+  const _RequestLoanButton({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => RequestLoanScreen(group: group)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _ink,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.account_balance_outlined,
+                color: Colors.white, size: 24),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF0F0F0),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        initials,
-                        style: GoogleFonts.sora(
+                  Text('Request a Loan',
+                      style: GoogleFonts.sora(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: _ink,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          userName,
-                          style: GoogleFonts.sora(
+                          color: Colors.white)),
+                  Text('Up to 50% of group savings',
+                      style: GoogleFonts.sora(
+                          fontSize: 11, color: Colors.white60)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios,
+                color: Colors.white60, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Pending loan card (with voting) ─────────────────────────────
+class _PendingLoanCard extends StatefulWidget {
+  final LoanModel loan;
+  final String currentUserId;
+  final int memberCount;
+  final bool showVote;
+  final Future<void> Function()? onCancel;
+
+  const _PendingLoanCard({
+    required this.loan,
+    required this.currentUserId,
+    required this.memberCount,
+    required this.showVote,
+    this.onCancel,
+  });
+
+  @override
+  State<_PendingLoanCard> createState() => _PendingLoanCardState();
+}
+
+class _PendingLoanCardState extends State<_PendingLoanCard> {
+  bool _voting = false;
+
+  Future<void> _vote(bool approve) async {
+    setState(() => _voting = true);
+    try {
+      await FirestoreService().voteOnLoan(
+        loanId: widget.loan.id,
+        voterId: widget.currentUserId,
+        approve: approve,
+        totalMemberCount: widget.memberCount,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed: $e', style: GoogleFonts.sora()),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _voting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = widget.loan;
+    final votingMembers =
+        (widget.memberCount - 1).clamp(1, widget.memberCount);
+    final needed = (votingMembers / 2).ceil();
+    final hasApproved = l.approvedBy.contains(widget.currentUserId);
+    final hasRejected = l.rejectedBy.contains(widget.currentUserId);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _loanInitials(l.userName),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.userName,
+                        style: GoogleFonts.sora(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _ink,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          'Loan Request',
-                          style: GoogleFonts.sora(
-                              fontSize: 12, color: _grey),
-                        ),
-                        if (date != null)
-                          Text(
-                            Formatters.date(date),
-                            style: GoogleFonts.sora(
-                                fontSize: 11, color: _grey),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'RWF ${amount.toStringAsFixed(0)}',
+                            color: _ink),
+                        overflow: TextOverflow.ellipsis),
+                    Text(
+                        'RWF ${l.amount.toStringAsFixed(0)}  ·  ${l.durationWeeks}w',
                         style: GoogleFonts.sora(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: _ink,
+                            fontSize: 12, color: _grey)),
+                  ],
+                ),
+              ),
+              _loanStatusBadge('Pending', Colors.amber.shade700,
+                  const Color(0xFFFFF8E1)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Text('${l.approvedBy.length}/$needed approvals',
+                  style: GoogleFonts.sora(fontSize: 11, color: _grey)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: needed == 0
+                        ? 1
+                        : (l.approvedBy.length / needed).clamp(0.0, 1.0),
+                    backgroundColor: const Color(0xFFEEEEEE),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(_ink),
+                    minHeight: 5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (widget.showVote) ...[
+            const SizedBox(height: 12),
+            _voting
+                ? const Center(
+                    child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: _ink, strokeWidth: 2)))
+                : Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              hasRejected ? null : () => _vote(false),
+                          icon: const Icon(Icons.close,
+                              size: 16, color: Colors.red),
+                          label: Text(
+                              hasRejected ? 'Rejected' : 'Reject',
+                              style: GoogleFonts.sora(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                                color: Colors.red, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 10),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF8E1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Pending',
-                          style: GoogleFonts.sora(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.amber[800],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed:
+                              hasApproved ? null : () => _vote(true),
+                          icon: const Icon(Icons.check,
+                              size: 16, color: Colors.white),
+                          label: Text(
+                              hasApproved ? 'Approved ✓' : 'Approve',
+                              style: GoogleFonts.sora(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                hasApproved ? Colors.green : _ink,
+                            disabledBackgroundColor: Colors.green,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ],
+          ],
+          // Cancel button — only for the requester's own pending loan
+          if (widget.onCancel != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: widget.onCancel,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                child: Text('Cancel Request',
+                    style: GoogleFonts.sora(
+                        fontSize: 13,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600)),
               ),
-            );
-          },
-        );
-      },
+            ),
+          ],
+        ],
+      ),
     );
   }
+}
+
+// ── Active loan card ─────────────────────────────────────────────
+class _ActiveLoanCard extends StatelessWidget {
+  final LoanModel loan;
+  final VoidCallback onPay;
+  const _ActiveLoanCard({required this.loan, required this.onPay});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = loan;
+    final isOverdue = l.isOverdue;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: isOverdue
+                ? Colors.red.shade200
+                : const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('RWF ${l.amount.toStringAsFixed(0)}',
+                  style: GoogleFonts.sora(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _ink)),
+              _loanStatusBadge(
+                isOverdue ? 'Overdue' : 'Active',
+                isOverdue ? Colors.red.shade700 : Colors.green.shade700,
+                isOverdue ? Colors.red.shade50 : Colors.green.shade50,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${l.durationWeeks}w  ·  Due ${_loanFmtDate(l.dueDate)}  ·  ${(l.interestRate * 100).toInt()}% interest',
+            style: GoogleFonts.sora(fontSize: 11, color: _grey),
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: LinearProgressIndicator(
+              value: l.progress,
+              backgroundColor: const Color(0xFFEEEEEE),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                  isOverdue ? Colors.red : _ink),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${(l.progress * 100).toInt()}% repaid',
+                  style: GoogleFonts.sora(fontSize: 11, color: _grey)),
+              Text('RWF ${l.remaining.toStringAsFixed(0)} left',
+                  style: GoogleFonts.sora(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _ink)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onPay,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isOverdue ? Colors.red : _ink,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: Text('Pay Loan',
+                  style: GoogleFonts.sora(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── History loan card ────────────────────────────────────────────
+class _HistoryLoanCard extends StatelessWidget {
+  final LoanModel loan;
+  const _HistoryLoanCard({required this.loan});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = loan;
+    final isCompleted = l.status == 'completed';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Row(
+        children: [
+          _loanInitials(l.userName),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.userName,
+                    style: GoogleFonts.sora(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _ink),
+                    overflow: TextOverflow.ellipsis),
+                Text('RWF ${l.amount.toStringAsFixed(0)}',
+                    style: GoogleFonts.sora(fontSize: 12, color: _grey)),
+              ],
+            ),
+          ),
+          _loanStatusBadge(
+            isCompleted ? 'Repaid' : 'Rejected',
+            isCompleted ? Colors.green.shade700 : Colors.red.shade700,
+            isCompleted ? Colors.green.shade50 : Colors.red.shade50,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Loan helpers (file-level) ─────────────────────────────────────
+Widget _loanInitials(String name) {
+  final txt = name
+      .trim()
+      .split(' ')
+      .map((w) => w.isNotEmpty ? w[0] : '')
+      .take(2)
+      .join()
+      .toUpperCase();
+  return Container(
+    width: 44,
+    height: 44,
+    decoration: const BoxDecoration(
+        color: Color(0xFFF0F0F0), shape: BoxShape.circle),
+    child: Center(
+      child: Text(txt,
+          style: GoogleFonts.sora(
+              fontSize: 14, fontWeight: FontWeight.w700, color: _ink)),
+    ),
+  );
+}
+
+Widget _loanStatusBadge(String label, Color text, Color bg) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(label,
+          style: GoogleFonts.sora(
+              fontSize: 10, fontWeight: FontWeight.w700, color: text)),
+    );
+
+String _loanFmtDate(DateTime d) {
+  const m = ['Jan','Feb','Mar','Apr','May','Jun',
+              'Jul','Aug','Sep','Oct','Nov','Dec'];
+  return '${m[d.month - 1]} ${d.day}';
 }
 
 // ── Info Tab ──
