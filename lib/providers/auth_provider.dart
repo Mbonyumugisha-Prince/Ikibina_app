@@ -6,18 +6,18 @@ import '../services/otp_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
-  final OtpService  _otpService  = OtpService();
+  final OtpService _otpService = OtpService();
 
   UserModel? _user;
   bool _loading = false;
   String? _error;
 
-  UserModel? get user        => _user;
-  bool get loading           => _loading;
-  String? get error          => _error;
-  bool get isAuthenticated   => _user != null;
+  UserModel? get user => _user;
+  bool get loading => _loading;
+  String? get error => _error;
+  bool get isAuthenticated => _user != null;
   // Reads emailVerified from the Firestore user document
-  bool get isEmailVerified   => _user?.emailVerified ?? false;
+  bool get isEmailVerified => _user?.emailVerified ?? false;
 
   AuthProvider() {
     _authService.authStateChanges.listen(_onAuthStateChanged);
@@ -111,11 +111,16 @@ class AuthProvider extends ChangeNotifier {
 
   String _otpResultMessage(OtpResult r) {
     switch (r) {
-      case OtpResult.invalid:     return 'Incorrect code. Please try again.';
-      case OtpResult.expired:     return 'Code expired. Tap resend for a new one.';
-      case OtpResult.alreadyUsed: return 'Code already used. Tap resend.';
-      case OtpResult.notFound:    return 'Code not found. Tap resend.';
-      default:                    return 'Verification failed.';
+      case OtpResult.invalid:
+        return 'Incorrect code. Please try again.';
+      case OtpResult.expired:
+        return 'Code expired. Tap resend for a new one.';
+      case OtpResult.alreadyUsed:
+        return 'Code already used. Tap resend.';
+      case OtpResult.notFound:
+        return 'Code not found. Tap resend.';
+      default:
+        return 'Verification failed.';
     }
   }
 
@@ -130,6 +135,42 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.resetPassword(email);
       _error = null;
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> changePassword(
+      {required String currentPassword, required String newPassword}) async {
+    _setLoading(true);
+    try {
+      await _authService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      _error = null;
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> updateProfile(
+      {required String name, required String phone}) async {
+    _setLoading(true);
+    try {
+      await _authService.updateProfile(name: name, phone: phone);
+      // Refresh the user data
+      _user = await _authService.getCurrentUserProfile();
+      _error = null;
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();

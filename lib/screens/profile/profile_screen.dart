@@ -6,6 +6,7 @@ import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../language/language_selection_screen.dart';
 import '../auth/login_screen.dart';
+import 'profile_information_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -227,6 +228,13 @@ class ProfileScreen extends StatelessWidget {
                 subtitle: s.nameEmailPhone,
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.black54),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileInformationScreen(),
+                    ),
+                  );
+                },
               ),
               _buildListTile(
                 title: s.kycVerification,
