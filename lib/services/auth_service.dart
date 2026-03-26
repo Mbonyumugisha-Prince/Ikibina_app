@@ -91,6 +91,16 @@ class AuthService {
     });
   }
 
+  Future<void> updatePhotoUrl(String photoUrl) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await user.updatePhotoURL(photoUrl);
+    await _firestore
+        .collection(AppConstants.usersCollection)
+        .doc(user.uid)
+        .update({'photoUrl': photoUrl});
+  }
+
   Future<void> changePassword(
       {required String currentPassword, required String newPassword}) async {
     final user = _auth.currentUser;

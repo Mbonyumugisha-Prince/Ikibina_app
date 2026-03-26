@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/cloudinary_service.dart';
 import '../auth/login_screen.dart';
 
 class ProfileInformationScreen extends StatefulWidget {
@@ -17,6 +22,8 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+  Uint8List? _imageBytes;
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -33,6 +40,46 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.user?.id ?? 'user';
+
+    setState(() {
+      _imageBytes = bytes;
+      _uploadingPhoto = true;
+    });
+    try {
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final url = await CloudinaryService.uploadImage(
+          bytes, 'profile_images/${userId}_$ts');
+      if (!mounted) return;
+      final ok = await context.read<AuthProvider>().updatePhotoUrl(url);
+      if (!mounted) return;
+      if (!ok) _snack('Failed to save photo.');
+    } catch (e) {
+      if (mounted) _snack('Upload failed: $e');
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: GoogleFonts.inter()),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+    ));
   }
 
   Future<void> _updateProfile() async {
@@ -206,6 +253,42 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ── Profile photo picker ──
+                    Center(
+                      child: GestureDetector(
+                        onTap: _uploadingPhoto ? null : _pickPhoto,
+                        child: Stack(
+                          children: [
+                            _buildPhotoCircle(auth.user?.photoUrl),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Colors.white, width: 2),
+                                ),
+                                child: _uploadingPhoto
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.add,
+                                        color: Colors.white, size: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
                     Text(
                       'Personal Details',
                       style: GoogleFonts.poppins(
@@ -334,6 +417,46 @@ class _ProfileInformationScreenState extends State<ProfileInformationScreen> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.black, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoCircle(String? photoUrl) {
+    const double radius = 50;
+    if (_imageBytes != null) {
+      return ClipOval(
+        child: Image.memory(_imageBytes!,
+            width: radius * 2, height: radius * 2, fit: BoxFit.cover),
+      );
+    }
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return ClipOval(
+        child: CachedNetworkImage(
+          key: ValueKey(photoUrl),
+          imageUrl: photoUrl,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _initialsCircle(radius),
+          errorWidget: (_, __, ___) => _initialsCircle(radius),
+        ),
+      );
+    }
+    return _initialsCircle(radius);
+  }
+
+  Widget _initialsCircle(double radius) {
+    final name = context.read<AuthProvider>().user?.name ?? '';
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey[300],
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: GoogleFonts.poppins(
+          fontSize: 32,
+          fontWeight: FontWeight.w600,
+          color: Colors.black54,
         ),
       ),
     );

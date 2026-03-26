@@ -682,11 +682,7 @@ class _IkiminaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAdmin = group.adminId == userId;
-    final memberCount = group.members.isEmpty ? 1 : group.members.length;
-    final target = group.contributionAmount * memberCount;
-    final progress = target > 0
-        ? (group.totalSavings / target).clamp(0.0, 1.0)
-        : 0.0;
+    final isGoal = group.groupType == 'goal';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -734,40 +730,14 @@ class _IkiminaCard extends StatelessWidget {
 
           // Group type label
           Text(
-            group.groupType == 'goal' ? 'Goal Group' : 'Ikimina',
+            isGoal ? 'Goal Group' : 'Ikimina',
             style: GoogleFonts.sora(fontSize: 13, color: _grey),
           ),
 
           const SizedBox(height: 14),
 
           // Progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: const Color(0xFFEEEEEE),
-              valueColor: const AlwaysStoppedAnimation<Color>(_ink),
-              minHeight: 7,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${(progress * 100).toInt()}% of goal',
-                style: GoogleFonts.sora(fontSize: 11, color: _grey),
-              ),
-              Text(
-                'RWF ${group.totalSavings.toStringAsFixed(0)}',
-                style: GoogleFonts.sora(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: _ink,
-                ),
-              ),
-            ],
-          ),
+          _buildProgress(group, isGoal),
 
           // Invite code (only if user is admin of this group)
           if (isAdmin && group.inviteCode.isNotEmpty) ...[
@@ -824,6 +794,77 @@ class _IkiminaCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildProgress(GroupModel g, bool isGoal) {
+    if (isGoal) {
+      final target = g.goalAmount;
+      final progress =
+          target > 0 ? (g.totalSavings / target).clamp(0.0, 1.0) : 0.0;
+      return _progressBar(progress, '${(progress * 100).toInt()}% of goal',
+          'RWF ${g.totalSavings.toStringAsFixed(0)}');
+    }
+
+    final freq = g.contributionFrequency.toLowerCase();
+    final cycleDays = (freq.contains('bi') && freq.contains('week'))
+        ? 14
+        : freq.contains('week')
+            ? 7
+            : 30;
+    final periodLabel = cycleDays == 7
+        ? 'weekly'
+        : cycleDays == 14
+            ? 'bi-weekly'
+            : 'monthly';
+    final cutoff = DateTime.now().subtract(Duration(days: cycleDays));
+    final memberCount = g.members.isEmpty ? 1 : g.members.length;
+    final cycleTarget = g.contributionAmount * memberCount;
+
+    return StreamBuilder<List<ContributionModel>>(
+      stream: FirestoreService().getGroupContributions(g.id),
+      builder: (ctx, snap) {
+        final cycleTotal = snap.hasData
+            ? snap.data!
+                .where((c) => c.date.isAfter(cutoff))
+                .fold(0.0, (acc, c) => acc + c.amount)
+            : 0.0;
+        final progress = cycleTarget > 0
+            ? (cycleTotal / cycleTarget).clamp(0.0, 1.0)
+            : 0.0;
+        return _progressBar(
+            progress,
+            '${(progress * 100).toInt()}% this $periodLabel cycle',
+            'RWF ${g.totalSavings.toStringAsFixed(0)}');
+      },
+    );
+  }
+
+  Widget _progressBar(double progress, String label, String right) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: const Color(0xFFEEEEEE),
+              valueColor: const AlwaysStoppedAnimation<Color>(_ink),
+              minHeight: 7,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: GoogleFonts.sora(fontSize: 11, color: _grey)),
+              Text(right,
+                  style: GoogleFonts.sora(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _ink)),
+            ],
+          ),
+        ],
+      );
 }
 
 // ── Recent activity item ──
