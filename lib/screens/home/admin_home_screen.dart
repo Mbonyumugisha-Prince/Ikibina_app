@@ -566,7 +566,7 @@ class _DashCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           Text(
-            group.contributionFrequency,
+            group.groupType == 'goal' ? 'Goal Group' : 'Ikimina',
             style: GoogleFonts.sora(fontSize: 12, color: Colors.white60),
           ),
           const SizedBox(height: 14),
@@ -731,9 +731,9 @@ class _IkiminaCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
 
-          // Ikimina type (frequency)
+          // Group type label
           Text(
-            group.contributionFrequency,
+            group.groupType == 'goal' ? 'Goal Group' : 'Ikimina',
             style: GoogleFonts.sora(fontSize: 13, color: _grey),
           ),
 
