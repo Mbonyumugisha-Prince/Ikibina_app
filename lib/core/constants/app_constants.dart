@@ -9,6 +9,7 @@ class AppConstants {
   static const String membersCollection = 'members';
   static const String contributionsCollection = 'contributions';
   static const String transactionsCollection = 'transactions';
+  static const String loansCollection = 'loans';
 
   // Firebase Storage paths
   static const String profileImagesPath = 'profile_images';

@@ -11,6 +11,7 @@ import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/firestore_service.dart';
 import '../contributions/add_contribution_screen.dart';
+import '../loans/request_loan_screen.dart';
 
 const _bg = Color(0xFFF5F5F5);
 const _ink = Color(0xFF1A1A1A);
@@ -433,35 +434,56 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                 const SizedBox(height: 32),
 
                 // Action Cards
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildActionCard(
+                // Group wallet (admin view): Transfer only
+                // My wallet, goal group:     Deposit only
+                // My wallet, ikimina group:  Deposit + Loan
+                Builder(builder: (_) {
+                  final isGoal = widget.group.groupType == 'goal';
+                  final cards = <Widget>[];
+
+                  if (isGroupWallet) {
+                    // Admin group wallet — Transfer only
+                    cards.add(_buildActionCard(
+                      icon: Icons.swap_horiz,
+                      label: s.transfer,
+                      onTap: () {},
+                    ));
+                  } else {
+                    // Personal wallet — always Deposit
+                    cards.add(_buildActionCard(
                       icon: Icons.add,
                       label: s.deposit,
-                      onTap: () {
-                        if (!isGroupWallet) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => AddContributionScreen(
-                                group: widget.group,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                    _buildActionCard(
-                        icon: Icons.swap_horiz,
-                        label: s.transfer,
-                        onTap: () {}),
-                    _buildActionCard(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              AddContributionScreen(group: widget.group),
+                        ),
+                      ),
+                    ));
+                    // Loan only for Ikimina groups
+                    if (!isGoal) {
+                      cards.add(_buildActionCard(
                         icon: Icons.account_balance,
                         label: s.loan,
-                        onTap: () {}),
-                  ],
-                ),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                RequestLoanScreen(group: widget.group),
+                          ),
+                        ),
+                      ));
+                    }
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: cards
+                        .expand((c) => [c, const SizedBox(width: 20)])
+                        .toList()
+                      ..removeLast(),
+                  );
+                }),
                 const SizedBox(height: 40),
 
                 // Transaction History

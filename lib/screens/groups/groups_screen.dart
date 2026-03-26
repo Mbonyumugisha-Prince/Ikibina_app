@@ -2,9 +2,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../../models/contribution_model.dart';
 import '../../models/group_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
+import '../../services/firestore_service.dart';
 import '../groups/group_info_screen.dart';
 
 const _bg = Color(0xFFF5F5F5);
@@ -100,10 +102,7 @@ class _GroupListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAdmin = group.adminId == userId;
-    final memberCount = group.members.isEmpty ? 1 : group.members.length;
-    final target = group.contributionAmount * memberCount;
-    final progress =
-        target > 0 ? (group.totalSavings / target).clamp(0.0, 1.0) : 0.0;
+    final isGoal = group.groupType == 'goal';
     final initials = group.name
         .trim()
         .split(' ')
@@ -162,28 +161,7 @@ class _GroupListCard extends StatelessWidget {
                 Text(group.contributionFrequency,
                     style: GoogleFonts.sora(fontSize: 12, color: _grey)),
                 const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: const Color(0xFFEEEEEE),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(_ink),
-                    minHeight: 5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('${(progress * 100).toInt()}% of goal',
-                        style:
-                            GoogleFonts.sora(fontSize: 11, color: _grey)),
-                    Text('${group.members.length} members',
-                        style:
-                            GoogleFonts.sora(fontSize: 11, color: _grey)),
-                  ],
-                ),
+                _buildProgress(group, isGoal),
               ],
             ),
           ),
@@ -193,6 +171,73 @@ class _GroupListCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildProgress(GroupModel g, bool isGoal) {
+    if (isGoal) {
+      final target = g.goalAmount;
+      final progress =
+          target > 0 ? (g.totalSavings / target).clamp(0.0, 1.0) : 0.0;
+      return _progressBar(progress, '${(progress * 100).toInt()}% of goal',
+          '${g.members.length} members');
+    }
+
+    final freq = g.contributionFrequency.toLowerCase();
+    final cycleDays = (freq.contains('bi') && freq.contains('week'))
+        ? 14
+        : freq.contains('week')
+            ? 7
+            : 30;
+    final periodLabel = cycleDays == 7
+        ? 'weekly'
+        : cycleDays == 14
+            ? 'bi-weekly'
+            : 'monthly';
+    final cutoff = DateTime.now().subtract(Duration(days: cycleDays));
+    final memberCount = g.members.isEmpty ? 1 : g.members.length;
+    final cycleTarget = g.contributionAmount * memberCount;
+
+    return StreamBuilder<List<ContributionModel>>(
+      stream: FirestoreService().getGroupContributions(g.id),
+      builder: (ctx, snap) {
+        final cycleTotal = snap.hasData
+            ? snap.data!
+                .where((c) => c.date.isAfter(cutoff))
+                .fold(0.0, (acc, c) => acc + c.amount)
+            : 0.0;
+        final progress = cycleTarget > 0
+            ? (cycleTotal / cycleTarget).clamp(0.0, 1.0)
+            : 0.0;
+        return _progressBar(progress,
+            '${(progress * 100).toInt()}% this $periodLabel cycle',
+            '${g.members.length} members');
+      },
+    );
+  }
+
+  Widget _progressBar(double progress, String label, String right) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: const Color(0xFFEEEEEE),
+              valueColor: const AlwaysStoppedAnimation<Color>(_ink),
+              minHeight: 5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: GoogleFonts.sora(fontSize: 11, color: _grey)),
+              Text(right,
+                  style: GoogleFonts.sora(fontSize: 11, color: _grey)),
+            ],
+          ),
+        ],
+      );
 }
 
 class _GroupAvatar extends StatelessWidget {
