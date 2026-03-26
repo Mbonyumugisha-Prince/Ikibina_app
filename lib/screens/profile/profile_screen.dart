@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -156,46 +157,7 @@ class ProfileScreen extends StatelessWidget {
             Center(
               child: Column(
                 children: [
-                  Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey[300],
-                        backgroundImage: user.photoUrl != null
-                            ? NetworkImage(user.photoUrl!)
-                            : null,
-                        child: user.photoUrl == null
-                            ? Text(
-                                user.name.isNotEmpty
-                                    ? user.name[0].toUpperCase()
-                                    : '?',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black54,
-                                ),
-                              )
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _ProfileAvatar(photoUrl: user.photoUrl, name: user.name),
                   const SizedBox(height: 16),
                   Text(
                     user.name,
@@ -370,4 +332,42 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  final String? photoUrl;
+  final String name;
+
+  const _ProfileAvatar({required this.photoUrl, required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    if (photoUrl != null && photoUrl!.isNotEmpty) {
+      return ClipOval(
+        child: CachedNetworkImage(
+          key: ValueKey(photoUrl),
+          imageUrl: photoUrl!,
+          width: 100,
+          height: 100,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _initials(),
+          errorWidget: (_, __, ___) => _initials(),
+        ),
+      );
+    }
+    return _initials();
+  }
+
+  Widget _initials() => CircleAvatar(
+        radius: 50,
+        backgroundColor: Colors.grey[300],
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: GoogleFonts.poppins(
+            fontSize: 36,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+      );
 }
