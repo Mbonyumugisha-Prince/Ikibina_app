@@ -10,6 +10,7 @@ import '../screens/groups/group_detail_screen.dart';
 import '../screens/groups/create_group_screen.dart';
 import '../screens/contributions/add_contribution_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/profile/kyc_verification_screen.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -23,6 +24,7 @@ class AppRoutes {
   static const String addContribution = '/contributions/add';
   static const String transactions = '/transactions';
   static const String profile = '/profile';
+  static const String kyc = '/kyc';
 
   static final router = GoRouter(
     initialLocation: home,
@@ -40,16 +42,22 @@ class AppRoutes {
     routes: [
       GoRoute(path: login, builder: (_, __) => const LoginScreen()),
       GoRoute(path: register, builder: (_, __) => const RegisterScreen()),
-      GoRoute(path: forgotPassword, builder: (_, __) => const ForgotPasswordScreen()),
+      GoRoute(
+          path: forgotPassword,
+          builder: (_, __) => const ForgotPasswordScreen()),
       GoRoute(path: home, builder: (_, __) => const HomeScreen()),
       GoRoute(path: groups, builder: (_, __) => const GroupsScreen()),
       GoRoute(path: createGroup, builder: (_, __) => const CreateGroupScreen()),
       GoRoute(
         path: groupDetail,
-        builder: (_, state) => GroupDetailScreen(groupId: state.pathParameters['id']!),
+        builder: (_, state) =>
+            GroupDetailScreen(groupId: state.pathParameters['id']!),
       ),
-      GoRoute(path: addContribution, builder: (_, __) => const AddContributionScreen()),
+      GoRoute(
+          path: addContribution,
+          builder: (_, __) => const AddContributionScreen()),
       GoRoute(path: profile, builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: kyc, builder: (_, __) => const KycVerificationScreen()),
     ],
   );
 }
