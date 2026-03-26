@@ -95,6 +95,43 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteGroup(String groupId) async {
+    _setLoading(true);
+    try {
+      await _service.deleteGroup(groupId);
+      _groups = _groups.where((g) => g.id != groupId).toList();
+      if (_currentGroup?.id == groupId) {
+        _currentGroup = _groups.isNotEmpty ? _groups.first : null;
+      }
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> updateGroup(GroupModel group) async {
+    _setLoading(true);
+    try {
+      await _service.updateGroup(group);
+      // Refresh the local list entry
+      _groups = _groups.map((g) => g.id == group.id ? group : g).toList();
+      if (_currentGroup?.id == group.id) _currentGroup = group;
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<GroupModel?> joinGroup(String inviteCode, String userId) async {
     _setLoading(true);
     try {

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -121,21 +122,7 @@ class _GroupListCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration:
-                const BoxDecoration(color: _ink, shape: BoxShape.circle),
-            child: Center(
-              child: Text(
-                initials,
-                style: GoogleFonts.sora(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white),
-              ),
-            ),
-          ),
+          _GroupAvatar(imageUrl: group.imageUrl, initials: initials, size: 52),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -203,6 +190,53 @@ class _GroupListCard extends StatelessWidget {
           const SizedBox(width: 8),
           const Icon(Icons.chevron_right, color: _grey, size: 20),
         ],
+      ),
+    );
+  }
+}
+
+class _GroupAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final String initials;
+  final double size;
+
+  const _GroupAvatar({
+    required this.imageUrl,
+    required this.initials,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: imageUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _initialsCircle(),
+          errorWidget: (_, __, ___) => _initialsCircle(),
+        ),
+      );
+    }
+    return _initialsCircle();
+  }
+
+  Widget _initialsCircle() {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(color: _ink, shape: BoxShape.circle),
+      child: Center(
+        child: Text(
+          initials,
+          style: GoogleFonts.sora(
+            fontSize: size * 0.35,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }

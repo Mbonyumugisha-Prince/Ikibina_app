@@ -18,11 +18,22 @@ class AppConstants {
   static const String prefOnboarded = 'onboarded';
   static const String prefThemeMode = 'theme_mode';
 
+  // Group types
+  static const String groupTypeIkimina = 'ikimina';
+  static const String groupTypeGoal = 'goal';
+
   // Contribution frequency options
   static const List<String> contributionFrequencies = [
     'Weekly',
     'Bi-weekly',
     'Monthly',
+  ];
+
+  // Ikimina duration options
+  static const List<String> groupDurations = [
+    '3 months',
+    '6 months',
+    '1 year',
   ];
 
   // Transaction types

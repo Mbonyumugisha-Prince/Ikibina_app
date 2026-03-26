@@ -103,6 +103,40 @@ class FirestoreService {
     await batch.commit();
   }
 
+  Future<void> updateGroup(GroupModel group) async {
+    await _db
+        .collection(AppConstants.groupsCollection)
+        .doc(group.id)
+        .update(group.toMap());
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    final groupDoc = await _db
+        .collection(AppConstants.groupsCollection)
+        .doc(groupId)
+        .get();
+    if (!groupDoc.exists) return;
+
+    final members =
+        List<String>.from(groupDoc.data()?['members'] ?? []);
+    final batch = _db.batch();
+
+    // Clear activeGroupId / role for every member
+    for (final memberId in members) {
+      batch.update(
+        _db.collection(AppConstants.usersCollection).doc(memberId),
+        {
+          'activeGroupId': FieldValue.delete(),
+          'activeGroupRole': FieldValue.delete(),
+        },
+      );
+    }
+
+    batch.delete(
+        _db.collection(AppConstants.groupsCollection).doc(groupId));
+    await batch.commit();
+  }
+
   Future<void> suspendMember(String groupId, String memberId) async {
     await _db.collection(AppConstants.groupsCollection).doc(groupId).update({
       'suspendedMembers': FieldValue.arrayUnion([memberId]),
@@ -131,6 +165,54 @@ class FirestoreService {
   }
 
   Future<void> addContribution(ContributionModel contribution) async {
+    // Fetch the group to run checks before writing
+    final groupDoc = await _db
+        .collection(AppConstants.groupsCollection)
+        .doc(contribution.groupId)
+        .get();
+    if (!groupDoc.exists) throw Exception('Group not found.');
+
+    final groupData = groupDoc.data()!;
+
+    // Block suspended members
+    final suspended = List<String>.from(groupData['suspendedMembers'] ?? []);
+    if (suspended.contains(contribution.userId)) {
+      throw Exception(
+          'Your account is suspended. You cannot make contributions.');
+    }
+
+    // For ikimina groups: enforce one contribution per cycle
+    final groupType = groupData['groupType'] as String? ?? 'ikimina';
+    if (groupType == 'ikimina') {
+      final freq =
+          (groupData['contributionFrequency'] as String? ?? 'Monthly')
+              .toLowerCase();
+      final int cycleDays;
+      if (freq.contains('bi') && freq.contains('week')) {
+        cycleDays = 14;
+      } else if (freq.contains('week')) {
+        cycleDays = 7;
+      } else {
+        cycleDays = 30;
+      }
+
+      final cutoff =
+          Timestamp.fromDate(DateTime.now().subtract(Duration(days: cycleDays)));
+
+      final recentSnap = await _db
+          .collection(AppConstants.contributionsCollection)
+          .where('groupId', isEqualTo: contribution.groupId)
+          .where('userId', isEqualTo: contribution.userId)
+          .where('date', isGreaterThan: cutoff)
+          .limit(1)
+          .get();
+
+      if (recentSnap.docs.isNotEmpty) {
+        throw Exception(
+            'You have already contributed this cycle. Please wait until the next cycle.');
+      }
+    }
+
     final batch = _db.batch();
     final contribRef =
         _db.collection(AppConstants.contributionsCollection).doc();
