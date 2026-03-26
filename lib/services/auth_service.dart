@@ -72,4 +72,39 @@ class AuthService {
     if (currentUser == null) return null;
     return _getUserById(currentUser!.uid);
   }
+
+  Future<void> updateProfile(
+      {required String name, required String phone}) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    await user.updateDisplayName(name);
+
+    await _firestore
+        .collection(AppConstants.usersCollection)
+        .doc(user.uid)
+        .update({
+      'name': name,
+      'phone': phone,
+      'updatedAt':
+          DateTime.now().toIso8601String(), // or FieldValue.serverTimestamp()
+    });
+  }
+
+  Future<void> changePassword(
+      {required String currentPassword, required String newPassword}) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No user currently logged in.');
+    if (user.email == null) throw Exception('User email is null.');
+
+    // 1. Re-authenticate the user
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: currentPassword,
+    );
+    await user.reauthenticateWithCredential(credential);
+
+    // 2. Update password
+    await user.updatePassword(newPassword);
+  }
 }
