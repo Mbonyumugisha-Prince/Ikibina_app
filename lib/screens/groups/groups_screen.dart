@@ -211,6 +211,7 @@ class _GroupAvatar extends StatelessWidget {
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       return ClipOval(
         child: CachedNetworkImage(
+          key: ValueKey(imageUrl),
           imageUrl: imageUrl!,
           width: size,
           height: size,

@@ -15,9 +15,15 @@ class CloudinaryService {
     final uri = Uri.parse(
         'https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
 
+    // Use a unique public_id each time so Cloudinary CDN never serves a stale
+    // cached version of the previous image.  The old image (if any) stays on
+    // the account but Cloudinary's generous free‑tier makes that fine.
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final uniqueId = 'group_images/${publicId}_$ts';
+
     final request = http.MultipartRequest('POST', uri)
       ..fields['upload_preset'] = _uploadPreset
-      ..fields['public_id'] = 'group_images/$publicId'
+      ..fields['public_id'] = uniqueId
       ..files.add(http.MultipartFile.fromBytes(
         'file',
         bytes,

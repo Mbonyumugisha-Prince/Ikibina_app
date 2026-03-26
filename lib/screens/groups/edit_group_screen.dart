@@ -172,7 +172,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
       inviteCode:           widget.group.inviteCode,
       groupType:            widget.group.groupType,
       contributionAmount:   parsedAmount,
-      contributionFrequency: _frequency,
+      contributionFrequency: _isGoal ? '' : _frequency,
       duration:             _duration,
       milestones:           milestones,
       totalSavings:         widget.group.totalSavings,
