@@ -186,7 +186,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       inviteCode: _inviteCode,
       groupType: _groupType,
       contributionAmount: parsedAmount,
-      contributionFrequency: _frequency,
+      contributionFrequency:
+          _groupType == AppConstants.groupTypeGoal ? '' : _frequency,
       duration: _duration,
       milestones: milestones,
       imageUrl: imageUrl,
