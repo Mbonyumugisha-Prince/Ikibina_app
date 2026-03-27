@@ -11,6 +11,7 @@ import '../screens/groups/create_group_screen.dart';
 import '../screens/contributions/add_contribution_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/profile/kyc_verification_screen.dart';
+import '../screens/profile/payment_methods_screen.dart';
 import '../screens/profile/security_2fa_screen.dart';
 
 class AppRoutes {
@@ -27,6 +28,7 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String kyc = '/kyc';
   static const String security2fa = '/security-2fa';
+  static const String paymentMethods = '/payment-methods';
 
   static final router = GoRouter(
     initialLocation: home,
@@ -61,6 +63,10 @@ class AppRoutes {
       GoRoute(path: profile, builder: (_, __) => const ProfileScreen()),
       GoRoute(path: kyc, builder: (_, __) => const KycVerificationScreen()),
       GoRoute(path: security2fa, builder: (_, __) => const Security2FAScreen()),
+      GoRoute(
+        path: paymentMethods,
+        builder: (_, __) => const PaymentMethodsScreen(),
+      ),
     ],
   );
 }
