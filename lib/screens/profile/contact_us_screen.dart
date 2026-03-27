@@ -44,17 +44,19 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final message = 'Type: ${_contactTypes[_selectedContactType]}\n\nMessage: ${_messageController.text}';
+      final message =
+          'Type: ${_contactTypes[_selectedContactType]}\n\nMessage: ${_messageController.text}';
       final encodedMessage = Uri.encodeComponent(message);
-      final whatsappUrl = Uri.parse('https://wa.me/250792342586?text=$encodedMessage');
-      
+      final whatsappUrl =
+          Uri.parse('https://wa.me/250792342586?text=$encodedMessage');
+
       if (await canLaunchUrl(whatsappUrl)) {
         await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
-        
+
         if (mounted) {
           setState(() => _isSubmitting = false);
           _messageController.clear();
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Opening WhatsApp to send your message...'),
@@ -154,9 +156,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                     title: 'WhatsApp Support',
                     subtitle: '0792342586',
                     onTap: () async {
-                      final whatsappUrl = Uri.parse('https://wa.me/250792342586');
+                      final whatsappUrl =
+                          Uri.parse('https://wa.me/250792342586');
                       if (await canLaunchUrl(whatsappUrl)) {
-                        await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+                        await launchUrl(whatsappUrl,
+                            mode: LaunchMode.externalApplication);
                       }
                     },
                     showDivider: false,
@@ -204,7 +208,8 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                     children: List.generate(
                       _contactTypes.length,
                       (index) => GestureDetector(
-                        onTap: () => setState(() => _selectedContactType = index),
+                        onTap: () =>
+                            setState(() => _selectedContactType = index),
                         child: Container(
                           decoration: BoxDecoration(
                             color: _selectedContactType == index
@@ -503,6 +508,4 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
       ),
     );
   }
-
-
 }
