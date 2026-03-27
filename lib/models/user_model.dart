@@ -10,6 +10,7 @@ class UserModel {
   final DateTime createdAt;
   final String? activeGroupId;
   final String? activeGroupRole;
+  final Map<String, dynamic>? notificationSettings;
 
   UserModel({
     required this.id,
@@ -21,6 +22,7 @@ class UserModel {
     required this.createdAt,
     this.activeGroupId,
     this.activeGroupRole,
+    this.notificationSettings,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -34,6 +36,8 @@ class UserModel {
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       activeGroupId: map['activeGroupId'] as String?,
       activeGroupRole: map['activeGroupRole'] as String?,
+      notificationSettings:
+          (map['notificationSettings'] as Map<String, dynamic>?),
     );
   }
 
@@ -47,6 +51,7 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'activeGroupId': activeGroupId,
       'activeGroupRole': activeGroupRole,
+      'notificationSettings': notificationSettings,
     };
   }
 }
