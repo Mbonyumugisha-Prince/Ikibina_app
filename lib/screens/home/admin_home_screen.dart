@@ -11,6 +11,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../services/firestore_service.dart';
+import '../../widgets/user_avatar.dart';
 import '../groups/create_group_screen.dart';
 import '../groups/group_info_screen.dart';
 import '../groups/groups_screen.dart';
@@ -876,13 +877,6 @@ class _ActivityItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = contribution.userName;
-    final initials = name
-        .trim()
-        .split(' ')
-        .map((w) => w.isNotEmpty ? w[0] : '')
-        .take(2)
-        .join()
-        .toUpperCase();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -894,23 +888,10 @@ class _ActivityItem extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF0F0F0),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: GoogleFonts.sora(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _ink,
-                ),
-              ),
-            ),
+          UserAvatar(
+            userId: contribution.userId,
+            displayName: contribution.userName,
+            size: 40,
           ),
           const SizedBox(width: 12),
           Expanded(
