@@ -7,6 +7,7 @@ import '../../models/group_model.dart';
 import '../../models/loan_model.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_service.dart';
+import '../../widgets/user_avatar.dart';
 import '../loans/pay_loan_screen.dart';
 import '../loans/request_loan_screen.dart';
 import 'edit_group_screen.dart';
@@ -557,14 +558,6 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = member.name
-        .trim()
-        .split(' ')
-        .map((w) => w.isNotEmpty ? w[0] : '')
-        .take(2)
-        .join()
-        .toUpperCase();
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -576,23 +569,13 @@ class _MemberTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: isAdmin ? _ink : const Color(0xFFF0F0F0),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: GoogleFonts.sora(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: isAdmin ? Colors.white : _ink,
-                ),
-              ),
-            ),
+          UserAvatar(
+            userId: member.id,
+            displayName: member.name,
+            size: 46,
+            knownPhotoUrl: member.photoUrl,
+            bgColor: isAdmin ? _ink : const Color(0xFFF0F0F0),
+            textColor: isAdmin ? Colors.white : _ink,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1135,7 +1118,7 @@ class _PendingLoanCardState extends State<_PendingLoanCard> {
         children: [
           Row(
             children: [
-              _loanInitials(l.userName),
+              _loanAvatar(l.userId, l.userName),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1379,7 +1362,7 @@ class _HistoryLoanCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _loanInitials(l.userName),
+          _loanAvatar(l.userId, l.userName),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1408,26 +1391,11 @@ class _HistoryLoanCard extends StatelessWidget {
 }
 
 // ── Loan helpers (file-level) ─────────────────────────────────────
-Widget _loanInitials(String name) {
-  final txt = name
-      .trim()
-      .split(' ')
-      .map((w) => w.isNotEmpty ? w[0] : '')
-      .take(2)
-      .join()
-      .toUpperCase();
-  return Container(
-    width: 44,
-    height: 44,
-    decoration: const BoxDecoration(
-        color: Color(0xFFF0F0F0), shape: BoxShape.circle),
-    child: Center(
-      child: Text(txt,
-          style: GoogleFonts.sora(
-              fontSize: 14, fontWeight: FontWeight.w700, color: _ink)),
-    ),
-  );
-}
+Widget _loanAvatar(String userId, String name) => UserAvatar(
+      userId: userId,
+      displayName: name,
+      size: 44,
+    );
 
 Widget _loanStatusBadge(String label, Color text, Color bg) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1578,9 +1546,6 @@ class _LeaderboardTab extends StatelessWidget {
           itemBuilder: (_, i) {
             final entry = ranked[i];
             final name  = names[entry.key] ?? 'Unknown';
-            final initials = name.trim().split(' ')
-                .map((w) => w.isNotEmpty ? w[0] : '')
-                .take(2).join().toUpperCase();
             final isTop3 = i < 3;
 
             return Container(
@@ -1611,20 +1576,11 @@ class _LeaderboardTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: i == 0 ? const Color(0xFFFFD54F) : const Color(0xFFF0F0F0),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(initials,
-                          style: GoogleFonts.sora(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: _ink)),
-                    ),
+                  UserAvatar(
+                    userId: entry.key,
+                    displayName: name,
+                    size: 42,
+                    bgColor: i == 0 ? const Color(0xFFFFD54F) : const Color(0xFFF0F0F0),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2017,18 +1973,11 @@ class _ContributionsTab extends StatelessWidget {
                     final data =
                         recent[i].data() as Map<String, dynamic>;
                     final userName = data['userName'] as String? ?? '';
+                    final userId = data['userId'] as String? ?? '';
                     final amount = (data['amount'] ?? 0).toDouble();
                     DateTime? date;
                     final raw = data['date'];
                     if (raw is Timestamp) date = raw.toDate();
-
-                    final initials = userName
-                        .trim()
-                        .split(' ')
-                        .map((w) => w.isNotEmpty ? w[0] : '')
-                        .take(2)
-                        .join()
-                        .toUpperCase();
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -2042,23 +1991,10 @@ class _ContributionsTab extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF0F0F0),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                initials,
-                                style: GoogleFonts.sora(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: _ink,
-                                ),
-                              ),
-                            ),
+                          UserAvatar(
+                            userId: userId,
+                            displayName: userName,
+                            size: 40,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
