@@ -105,7 +105,7 @@ class _AddContributionScreenState extends State<AddContributionScreen> {
           if (mounted) Navigator.of(context).pop();
         });
       } else {
-        _showError(groupProvider.error ?? s.failedToAddContribution);
+        _showError(groupProvider.contributionError ?? s.failedToAddContribution);
       }
     } catch (e) {
       if (mounted) {
