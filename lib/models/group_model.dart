@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'penalty_model.dart';
 
 class MilestoneModel {
   final String name;
@@ -49,6 +50,9 @@ class GroupModel {
   final String? imageUrl;
   final DateTime createdAt;
 
+  /// Penalty escalation rules – only used for 'ikimina' groups.
+  final GroupPenaltyRules? penaltyRules;
+
   /// Computed total goal for 'goal' groups
   double get goalAmount =>
       milestones.fold(0.0, (acc, m) => acc + m.targetAmount);
@@ -71,6 +75,7 @@ class GroupModel {
     this.suspendedMembers = const [],
     this.imageUrl,
     required this.createdAt,
+    this.penaltyRules,
   }) : adminId = adminId ?? createdBy;
 
   factory GroupModel.fromMap(String id, Map<String, dynamic> map) {
@@ -101,6 +106,10 @@ class GroupModel {
       memberCount: map['memberCount'] ?? 0,
       imageUrl: map['imageUrl'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
+      penaltyRules: map['penaltyRules'] is Map<String, dynamic>
+          ? GroupPenaltyRules.fromMap(
+              map['penaltyRules'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -122,6 +131,7 @@ class GroupModel {
       'suspendedMembers': suspendedMembers,
       'imageUrl': imageUrl,
       'createdAt': Timestamp.fromDate(createdAt),
+      if (penaltyRules != null) 'penaltyRules': penaltyRules!.toMap(),
     };
   }
 }

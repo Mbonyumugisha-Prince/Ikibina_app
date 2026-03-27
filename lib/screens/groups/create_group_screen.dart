@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../models/group_model.dart';
+import '../../models/penalty_model.dart';
 import '../../core/constants/app_constants.dart';
 import '../../services/cloudinary_service.dart';
 import '../home/admin_home_screen.dart';
@@ -41,6 +42,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final _amountCtrl = TextEditingController();
   String _frequency = 'Monthly';
   String _duration  = '3 months';
+  GroupPenaltyRules _penaltyRules = GroupPenaltyRules.defaults();
 
   // ── Goal / milestone fields ────────────────────────────────────
   final List<_MilestoneEntry> _milestones = [
@@ -192,6 +194,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       milestones: milestones,
       imageUrl: imageUrl,
       createdAt: DateTime.now(),
+      penaltyRules: _groupType == AppConstants.groupTypeIkimina
+          ? _penaltyRules
+          : null,
     );
 
     final success = await group.createGroup(newGroup, auth.user!.id);
@@ -423,6 +428,20 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   value: _duration,
                   items: AppConstants.groupDurations,
                   onChanged: (v) => setState(() => _duration = v!),
+                ),
+                const SizedBox(height: 24),
+
+                // ── Penalty Rules ────────────────────────────────
+                _SectionLabel('Penalty Rules'),
+                const SizedBox(height: 6),
+                Text(
+                  'Automatically enforced when members miss contribution deadlines.',
+                  style: GoogleFonts.sora(fontSize: 12, color: _grey),
+                ),
+                const SizedBox(height: 12),
+                _PenaltySetupCard(
+                  rules: _penaltyRules,
+                  onChanged: (r) => setState(() => _penaltyRules = r),
                 ),
                 const SizedBox(height: 36),
               ],
@@ -784,6 +803,157 @@ class _GoalTotalPreview extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Penalty setup card (used in CreateGroupScreen) ─────────────────
+
+class _PenaltySetupCard extends StatelessWidget {
+  final GroupPenaltyRules rules;
+  final ValueChanged<GroupPenaltyRules> onChanged;
+
+  const _PenaltySetupCard({required this.rules, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border, width: 1.5),
+      ),
+      child: Column(
+        children: [
+          _tile(
+            level: 1,
+            icon: Icons.notifications_outlined,
+            title: 'Gentle Reminder',
+            subtitle:
+                'Push notification & email ${rules.gentleReminderHoursAfterDeadline}h after deadline',
+            enabled: rules.gentleReminderEnabled,
+            onToggle: (v) =>
+                onChanged(rules.copyWith(gentleReminderEnabled: v)),
+            showDivider: true,
+          ),
+          _tile(
+            level: 2,
+            icon: Icons.percent_outlined,
+            title: 'Late Fee',
+            subtitle:
+                '${rules.lateFeePercent.toStringAsFixed(0)}% fee after ${rules.lateFeeDaysLate} days late',
+            enabled: rules.lateFeeEnabled,
+            onToggle: (v) => onChanged(rules.copyWith(lateFeeEnabled: v)),
+            showDivider: true,
+          ),
+          _tile(
+            level: 3,
+            icon: Icons.lock_outline,
+            title: 'Account Freeze',
+            subtitle:
+                'No loans after ${rules.accountFreezeCyclesMissed} missed cycle(s)',
+            enabled: rules.accountFreezeEnabled,
+            onToggle: (v) =>
+                onChanged(rules.copyWith(accountFreezeEnabled: v)),
+            showDivider: true,
+          ),
+          _tile(
+            level: 4,
+            icon: Icons.exit_to_app_outlined,
+            title: 'Expulsion',
+            subtitle:
+                'Permanent removal after ${rules.expulsionCyclesMissed} missed cycles',
+            enabled: rules.expulsionEnabled,
+            onToggle: (v) => onChanged(rules.copyWith(expulsionEnabled: v)),
+            showDivider: false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile({
+    required int level,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool enabled,
+    required ValueChanged<bool> onToggle,
+    required bool showDivider,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: enabled ? _ink : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: Colors.white, size: 17),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.sora(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: enabled ? _ink : _grey,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: enabled ? _ink : Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'L$level',
+                            style: GoogleFonts.sora(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.sora(
+                          fontSize: 11,
+                          color: enabled ? Colors.black54 : _grey),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: enabled,
+                onChanged: onToggle,
+                activeThumbColor: _ink,
+                activeTrackColor: Colors.grey.shade300,
+                inactiveThumbColor: Colors.grey.shade400,
+                inactiveTrackColor: Colors.grey.shade200,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+        ),
+        if (showDivider)
+          Divider(height: 1, color: Colors.grey.shade100, indent: 14, endIndent: 14),
+      ],
     );
   }
 }
