@@ -11,6 +11,7 @@ class UserModel {
   final String? activeGroupId;
   final String? activeGroupRole;
   final Map<String, dynamic>? notificationSettings;
+  final bool twoFactorEnabled;
 
   UserModel({
     required this.id,
@@ -23,6 +24,7 @@ class UserModel {
     this.activeGroupId,
     this.activeGroupRole,
     this.notificationSettings,
+    this.twoFactorEnabled = false,
   });
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -38,6 +40,7 @@ class UserModel {
       activeGroupRole: map['activeGroupRole'] as String?,
       notificationSettings:
           (map['notificationSettings'] as Map<String, dynamic>?),
+      twoFactorEnabled: map['twoFactorEnabled'] as bool? ?? false,
     );
   }
 
@@ -52,6 +55,7 @@ class UserModel {
       'activeGroupId': activeGroupId,
       'activeGroupRole': activeGroupRole,
       'notificationSettings': notificationSettings,
+      'twoFactorEnabled': twoFactorEnabled,
     };
   }
 }
