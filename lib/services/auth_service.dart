@@ -121,14 +121,35 @@ class AuthService {
     if (user == null) throw Exception('No user currently logged in.');
     if (user.email == null) throw Exception('User email is null.');
 
-    // 1. Re-authenticate the user
     final credential = EmailAuthProvider.credential(
       email: user.email!,
       password: currentPassword,
     );
     await user.reauthenticateWithCredential(credential);
-
-    // 2. Update password
     await user.updatePassword(newPassword);
+  }
+
+  /// Re-authenticates the current user with their email and password.
+  Future<void> reauthenticate(String password) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No user currently logged in.');
+    if (user.email == null) throw Exception('User email is null.');
+
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: password,
+    );
+    await user.reauthenticateWithCredential(credential);
+  }
+
+  /// Saves the 2FA enabled status to the user's Firestore document.
+  Future<void> set2FAEnabled(bool enabled) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No user currently logged in.');
+
+    await _firestore
+        .collection(AppConstants.usersCollection)
+        .doc(user.uid)
+        .update({'twoFactorEnabled': enabled});
   }
 }
