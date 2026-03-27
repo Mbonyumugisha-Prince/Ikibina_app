@@ -9,6 +9,7 @@ import '../language/language_selection_screen.dart';
 import '../auth/login_screen.dart';
 import 'kyc_verification_screen.dart';
 import 'penalties_info_screen.dart';
+import 'payment_methods_screen.dart';
 import 'profile_information_screen.dart';
 import 'security_2fa_screen.dart';
 
@@ -239,7 +240,13 @@ class ProfileScreen extends StatelessWidget {
                 leadingIcon: Icons.credit_card_outlined,
                 trailing:
                     const Icon(Icons.chevron_right, color: Colors.black54),
-                onTap: () {},
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PaymentMethodsScreen(),
+                    ),
+                  );
+                },
                 showDivider: false,
               ),
             ]),
