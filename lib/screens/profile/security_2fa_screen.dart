@@ -1,7 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+
+enum _TwoFAStep { idle, enterPassword, enterOTP }
 
 class Security2FAScreen extends StatefulWidget {
   const Security2FAScreen({super.key});
@@ -11,122 +13,95 @@ class Security2FAScreen extends StatefulWidget {
 }
 
 class _Security2FAScreenState extends State<Security2FAScreen> {
-  late TextEditingController _verificationCodeController;
-  bool _enable2FA = false;
-  bool _is2FASetupInProgress = false;
-  bool _showQRCode = false;
-  bool _showBackupCodes = false;
-  bool _backupCodesDownloaded = false;
-  List<String> _backupCodes = [];
-  String? _setupError;
-
-  @override
-  void initState() {
-    super.initState();
-    _verificationCodeController = TextEditingController();
-    _generateBackupCodes();
-  }
+  _TwoFAStep _step = _TwoFAStep.idle;
+  final _passwordController = TextEditingController();
+  final _otpController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
-    _verificationCodeController.dispose();
+    _passwordController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
-  void _generateBackupCodes() {
-    _backupCodes = [
-      'A3F7-8B2C-9X4K',
-      'M5P1-7Q9L-2R8T',
-      'J6S4-3U5V-1W2Y',
-      'N8Z7-4A1B-5C9D',
-      'E2F6-7G3H-8I4J',
-      'K5L1-9M2N-6O3P',
-      'Q7R4-2S8T-1U9V',
-      'W3X5-6Y1Z-4A8B',
-    ];
-  }
-
-  Future<void> _initiate2FASetup() async {
-    setState(() {
-      _is2FASetupInProgress = true;
-      _setupError = null;
-      _showQRCode = true;
-    });
-
-    try {
-      await Future.delayed(const Duration(milliseconds: 800));
-      setState(() {
-        _showQRCode = true;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Scan the QR code with your authenticator app'),
-            backgroundColor: Colors.blue,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _setupError = 'Failed to generate 2FA setup: $e';
-        _showQRCode = false;
-      });
-    }
-  }
-
-  Future<void> _verify2FACode() async {
-    final code = _verificationCodeController.text.trim();
-
-    if (code.isEmpty) {
-      setState(() {
-        _setupError =
-            'Please enter the 6-digit code from your authenticator app';
-      });
-      return;
-    }
-
-    if (code.length != 6 || !RegExp(r'^[0-9]{6}$').hasMatch(code)) {
-      setState(() {
-        _setupError = 'Please enter a valid 6-digit code';
-      });
+  Future<void> _sendCode() async {
+    final password = _passwordController.text.trim();
+    if (password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your password.');
       return;
     }
 
     setState(() {
-      _is2FASetupInProgress = true;
-      _setupError = null;
+      _isLoading = true;
+      _errorMessage = null;
     });
 
-    try {
-      await Future.delayed(const Duration(milliseconds: 1000));
-      setState(() {
-        _enable2FA = true;
-        _is2FASetupInProgress = false;
-        _showBackupCodes = true;
-        _verificationCodeController.clear();
-      });
+    final auth = context.read<AuthProvider>();
+    final success = await auth.initiate2FASetup(password);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('2FA enabled successfully!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
       setState(() {
-        _setupError = 'Verification failed: $e';
-        _is2FASetupInProgress = false;
+        _step = _TwoFAStep.enterOTP;
+        _passwordController.clear();
+      });
+    } else {
+      setState(() {
+        _errorMessage = auth.error ?? 'Incorrect password. Please try again.';
       });
     }
+  }
+
+  Future<void> _verifyAndEnable() async {
+    final otp = _otpController.text.trim();
+    if (otp.length != 6 || !RegExp(r'^\d{6}$').hasMatch(otp)) {
+      setState(() => _errorMessage = 'Please enter the 6-digit code from your email.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final auth = context.read<AuthProvider>();
+    final success = await auth.verify2FAAndEnable(otp);
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      _otpController.clear();
+      setState(() => _step = _TwoFAStep.idle);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Two-factor authentication enabled!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      setState(() {
+        _errorMessage = auth.error ?? 'Incorrect code. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _resendCode() async {
+    setState(() {
+      _step = _TwoFAStep.enterPassword;
+      _otpController.clear();
+      _errorMessage = null;
+    });
   }
 
   Future<void> _disable2FA() async {
-    showDialog(
+    final auth = context.read<AuthProvider>();
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
@@ -138,16 +113,15 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
           ),
         ),
         content: Text(
-          'Disabling 2FA will reduce your account security. Are you sure you want to continue?',
+          'Disabling 2FA will reduce your account security. Are you sure?',
           style: GoogleFonts.inter(
             fontSize: 14,
-            fontWeight: FontWeight.w400,
             color: Colors.black87,
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Cancel',
               style: GoogleFonts.poppins(
@@ -158,38 +132,7 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
             ),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                setState(() {
-                  _enable2FA = false;
-                  _showQRCode = false;
-                  _showBackupCodes = false;
-                  _backupCodesDownloaded = false;
-                  _verificationCodeController.clear();
-                });
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('2FA has been disabled'),
-                      backgroundColor: Colors.orange,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to disable 2FA: $e'),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                }
-              }
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Disable',
               style: GoogleFonts.poppins(
@@ -202,19 +145,29 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
         ],
       ),
     );
-  }
 
-  void _downloadBackupCodes() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Backup codes copied to clipboard'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
-    setState(() {
-      _backupCodesDownloaded = true;
-    });
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    final success = await auth.disable2FA();
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Two-factor authentication disabled.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.error ?? 'Failed to disable 2FA.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -228,6 +181,8 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    final is2FAEnabled = auth.twoFactorEnabled;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -251,24 +206,22 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
+
+            // ── Status Banner ──────────────────────────────────────
             Container(
               decoration: BoxDecoration(
-                color:
-                    _enable2FA ? Colors.green.shade50 : Colors.orange.shade50,
+                color: is2FAEnabled ? Colors.green.shade50 : Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _enable2FA
-                      ? Colors.green.shade300
-                      : Colors.orange.shade300,
-                  width: 1,
+                  color: is2FAEnabled ? Colors.green.shade300 : Colors.orange.shade300,
                 ),
               ),
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   Icon(
-                    _enable2FA ? Icons.shield_rounded : Icons.warning_rounded,
-                    color: _enable2FA ? Colors.green : Colors.orange,
+                    is2FAEnabled ? Icons.shield_rounded : Icons.warning_rounded,
+                    color: is2FAEnabled ? Colors.green : Colors.orange,
                     size: 24,
                   ),
                   const SizedBox(width: 12),
@@ -277,24 +230,23 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _enable2FA ? '2FA is Enabled' : '2FA is Not Enabled',
+                          is2FAEnabled ? '2FA is Enabled' : '2FA is Not Enabled',
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _enable2FA
+                            color: is2FAEnabled
                                 ? Colors.green.shade800
                                 : Colors.orange.shade800,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _enable2FA
+                          is2FAEnabled
                               ? 'Your account is protected with two-factor authentication'
                               : 'Protect your account with two-factor authentication',
                           style: GoogleFonts.inter(
                             fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            color: _enable2FA
+                            color: is2FAEnabled
                                 ? Colors.green.shade700
                                 : Colors.orange.shade700,
                           ),
@@ -305,7 +257,10 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                 ],
               ),
             ),
+
             const SizedBox(height: 32),
+
+            // ── 2FA Section ────────────────────────────────────────
             Text(
               'Two-Factor Authentication',
               style: GoogleFonts.poppins(
@@ -319,12 +274,13 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300, width: 1),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -333,7 +289,7 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Authenticator App',
+                              'Email Authentication',
                               style: GoogleFonts.inter(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -342,12 +298,11 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Time-based one-time passwords (TOTP)',
+                              'Receive a one-time code on your email to verify your identity',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w400,
                                 color: Colors.black54,
                               ),
                             ),
@@ -355,13 +310,15 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      if (!_enable2FA)
+                      if (!is2FAEnabled && _step == _TwoFAStep.idle)
                         ElevatedButton.icon(
-                          onPressed:
-                              _is2FASetupInProgress ? null : _initiate2FASetup,
+                          onPressed: () => setState(() {
+                            _step = _TwoFAStep.enterPassword;
+                            _errorMessage = null;
+                          }),
                           icon: const Icon(Icons.add, size: 18),
                           label: Text(
-                            'Setup',
+                            'Enable',
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -369,10 +326,9 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
-                            disabledBackgroundColor: Colors.grey.shade300,
                           ),
                         )
-                      else
+                      else if (is2FAEnabled)
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
@@ -399,80 +355,191 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                         ),
                     ],
                   ),
-                  if (_showQRCode && !_enable2FA) ...[
+
+                  // ── Step 1: Enter Password ─────────────────────────
+                  if (!is2FAEnabled && _step == _TwoFAStep.enterPassword) ...[
                     const SizedBox(height: 16),
-                    const Divider(height: 1, thickness: 1),
+                    const Divider(height: 1),
                     const SizedBox(height: 16),
                     Text(
-                      'Scan QR Code',
+                      'Verify Your Identity',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Enter your email and password to confirm it\'s you. A code will be sent to ${user.email}.',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Email display (read-only)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        user.email,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Center(
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                    // Password field
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
+                        hintText: 'Password',
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade300),
                         ),
-                        child: Center(
-                          child: Text(
-                            'QR Code\notpauth://totp/User@ikibina',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.black54,
-                            ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                              color: Colors.blue, width: 2),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: Colors.black45,
+                          ),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
+                        ),
+                      ),
+                      style: GoogleFonts.inter(fontSize: 14),
+                    ),
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage!,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.red.shade600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _sendCode,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: Colors.blue.shade200, width: 1),
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline,
-                              color: Colors.blue.shade800, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Use Google Authenticator, Microsoft Authenticator, or Authy to scan this code.',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.blue.shade800,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : Text(
+                                'Send Code to Email',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Enter Verification Code',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
                       ),
                     ),
                     const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => setState(() {
+                          _step = _TwoFAStep.idle;
+                          _errorMessage = null;
+                          _passwordController.clear();
+                        }),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // ── Step 2: Enter OTP ──────────────────────────────
+                  if (!is2FAEnabled && _step == _TwoFAStep.enterOTP) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.email_outlined,
+                              color: Colors.blue.shade700, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Check your email',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              Text(
+                                'A 6-digit code was sent to ${user.email}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     TextField(
-                      controller: _verificationCodeController,
+                      controller: _otpController,
                       keyboardType: TextInputType.number,
                       maxLength: 6,
                       textAlign: TextAlign.center,
@@ -482,20 +549,20 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide:
-                              BorderSide(color: Colors.grey.shade300, width: 1),
+                              BorderSide(color: Colors.grey.shade300),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide:
-                              BorderSide(color: Colors.grey.shade300, width: 1),
+                              BorderSide(color: Colors.grey.shade300),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                              const BorderSide(color: Colors.blue, width: 2),
+                          borderSide: const BorderSide(
+                              color: Colors.blue, width: 2),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
+                            horizontal: 16, vertical: 14),
                       ),
                       style: GoogleFonts.poppins(
                         fontSize: 24,
@@ -504,13 +571,12 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                         color: Colors.black,
                       ),
                     ),
-                    if (_setupError != null) ...[
+                    if (_errorMessage != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        _setupError!,
+                        _errorMessage!,
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          fontWeight: FontWeight.w400,
                           color: Colors.red.shade600,
                         ),
                       ),
@@ -519,8 +585,7 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed:
-                            _is2FASetupInProgress ? null : _verify2FACode,
+                        onPressed: _isLoading ? null : _verifyAndEnable,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -529,7 +594,7 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: _is2FASetupInProgress
+                        child: _isLoading
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
@@ -549,23 +614,59 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                               ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Didn't receive the code? ",
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _isLoading ? null : _resendCode,
+                          child: Text(
+                            'Resend',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                  if (_enable2FA) ...[
+
+                  // ── Disable button (when enabled) ──────────────────
+                  if (is2FAEnabled) ...[
                     const SizedBox(height: 16),
-                    const Divider(height: 1, thickness: 1),
+                    const Divider(height: 1),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: _disable2FA,
+                        onPressed: _isLoading ? null : _disable2FA,
                         icon: const Icon(Icons.lock_open_outlined, size: 18),
-                        label: Text(
-                          'Disable 2FA',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        label: _isLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.red),
+                                ),
+                              )
+                            : Text(
+                                'Disable 2FA',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: const BorderSide(color: Colors.red),
@@ -580,144 +681,10 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                 ],
               ),
             ),
-            if (_showBackupCodes && !_backupCodesDownloaded) ...[
-              const SizedBox(height: 32),
-              Text(
-                'Save Your Backup Codes',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Save these backup codes in a safe place. You can use them to access your account if you lose access to your authenticator app.',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.black54,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200, width: 1),
-                ),
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning_rounded,
-                        color: Colors.red.shade800, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Each code can only be used once. Store them securely!',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.red.shade800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300, width: 1),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 2.5,
-                  ),
-                  itemCount: _backupCodes.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: Colors.grey.shade300, width: 1),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _backupCodes[index],
-                          style: GoogleFonts.robotoMono(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _downloadBackupCodes,
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: Text(
-                    'Download & Save Backup Codes',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _showBackupCodes = false;
-                      _backupCodesDownloaded = true;
-                    });
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Colors.blue),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    'I Have Saved My Backup Codes',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+
             const SizedBox(height: 32),
+
+            // ── Security Tips ──────────────────────────────────────
             Text(
               'Security Tips',
               style: GoogleFonts.poppins(
@@ -731,7 +698,7 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300, width: 1),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -744,10 +711,10 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                   ),
                   Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
                   _buildSecurityTip(
-                    icon: Icons.backup_outlined,
-                    title: 'Save Backup Codes',
+                    icon: Icons.email_outlined,
+                    title: 'Keep Your Email Secure',
                     description:
-                        'Keep your backup codes in a safe place to recover your account if needed.',
+                        'Since codes are sent to your email, make sure your email account is also well protected.',
                   ),
                   Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
                   _buildSecurityTip(
@@ -758,10 +725,10 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                   ),
                   Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
                   _buildSecurityTip(
-                    icon: Icons.info_outlined,
-                    title: 'Recovery Options',
+                    icon: Icons.warning_amber_outlined,
+                    title: 'Never Share Codes',
                     description:
-                        'Use backup codes if you lose access to your authenticator app.',
+                        'Ikimina will never ask you for your verification code. Do not share it with anyone.',
                     showDivider: false,
                   ),
                 ],
@@ -804,7 +771,6 @@ class _Security2FAScreenState extends State<Security2FAScreen> {
                   description,
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    fontWeight: FontWeight.w400,
                     color: Colors.black54,
                   ),
                 ),

@@ -12,6 +12,7 @@ import '../home/member_home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'email_verification_screen.dart';
+import 'login_2fa_screen.dart';
 
 const _bg     = Color(0xFFF5F5F5);
 const _ink    = Color(0xFF1A1A1A);
@@ -68,6 +69,22 @@ class _LoginScreenState extends State<LoginScreen> {
             email: email,
             name: displayName,
           ),
+        ),
+      );
+      return;
+    }
+
+    // Check 2FA — send OTP and redirect to challenge screen
+    if (auth.twoFactorEnabled) {
+      final otpSent = await auth.sendLogin2FAOtp();
+      if (!mounted) return;
+      if (!otpSent) {
+        _showError(auth.error ?? 'Failed to send 2FA code. Please try again.');
+        return;
+      }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => Login2FAScreen(email: email),
         ),
       );
       return;
