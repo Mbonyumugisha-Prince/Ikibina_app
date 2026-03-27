@@ -101,6 +101,20 @@ class AuthService {
         .update({'photoUrl': photoUrl});
   }
 
+  Future<void> updateNotificationSettings(
+      Map<String, dynamic> notificationSettings) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    await _firestore
+        .collection(AppConstants.usersCollection)
+        .doc(user.uid)
+        .update({
+      'notificationSettings': notificationSettings,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
   Future<void> changePassword(
       {required String currentPassword, required String newPassword}) async {
     final user = _auth.currentUser;
