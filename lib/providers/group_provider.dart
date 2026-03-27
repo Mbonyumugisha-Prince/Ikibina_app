@@ -14,6 +14,7 @@ class GroupProvider extends ChangeNotifier {
   GroupModel? _currentGroup;
   bool _loading = false;
   String? _error;
+  String? _contributionError;
   bool _hasAttemptedLoad = false;
   String? _loadedUserId;
 
@@ -21,6 +22,7 @@ class GroupProvider extends ChangeNotifier {
   GroupModel? get currentGroup => _currentGroup;
   bool get loading => _loading;
   String? get error => _error;
+  String? get contributionError => _contributionError;
   bool get hasAttemptedLoad => _hasAttemptedLoad;
   String? get loadedUserId => _loadedUserId;
 
@@ -151,10 +153,10 @@ class GroupProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await _service.addContribution(contribution);
-      _error = null;
+      _contributionError = null;
       return true;
     } catch (e) {
-      _error = e.toString();
+      _contributionError = e.toString();
       return false;
     } finally {
       _setLoading(false);
