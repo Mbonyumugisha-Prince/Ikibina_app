@@ -8,6 +8,16 @@ import '../core/constants/app_constants.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  // Users
+  Future<String?> getUserPhotoUrl(String userId) async {
+    final doc = await _db
+        .collection(AppConstants.usersCollection)
+        .doc(userId)
+        .get();
+    if (!doc.exists) return null;
+    return doc.data()?['photoUrl'] as String?;
+  }
+
   // Groups
   Stream<List<GroupModel>> getUserGroups(String userId) {
     return _db
