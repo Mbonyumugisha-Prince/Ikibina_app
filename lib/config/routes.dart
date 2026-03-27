@@ -12,6 +12,7 @@ import '../screens/contributions/add_contribution_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/profile/kyc_verification_screen.dart';
 import '../screens/profile/notification_settings_screen.dart';
+import '../screens/profile/contact_us_screen.dart';
 import '../screens/profile/payment_methods_screen.dart';
 import '../screens/profile/security_2fa_screen.dart';
 
@@ -31,6 +32,7 @@ class AppRoutes {
   static const String security2fa = '/security-2fa';
   static const String paymentMethods = '/payment-methods';
   static const String notifications = '/notifications';
+  static const String contactUs = '/contact-us';
 
   static final router = GoRouter(
     initialLocation: home,
@@ -72,6 +74,10 @@ class AppRoutes {
       GoRoute(
         path: notifications,
         builder: (_, __) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: contactUs,
+        builder: (_, __) => const ContactUsScreen(),
       ),
     ],
   );
