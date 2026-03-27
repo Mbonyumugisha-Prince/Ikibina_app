@@ -260,6 +260,370 @@ class OtpService {
     } catch (_) {}
   }
 
+  // ── Send 2FA OTP ──────────────────────────────────────────────
+  Future<void> send2FAOtp(
+    String uid,
+    String email, {
+    String name = '',
+  }) async {
+    final displayName = name.isNotEmpty ? name : email.split('@')[0];
+    final otp = _generateOtp();
+    final expires = DateTime.now().add(const Duration(minutes: 10));
+
+    await _db.collection('2fa_otps').doc(email).set({
+      'uid': uid,
+      'otp': otp,
+      'email': email,
+      'expiresAt': Timestamp.fromDate(expires),
+      'verified': false,
+      'attempts': 0,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    final response = await http.post(
+      Uri.parse(_resendUrl),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'from': 'Ikimina <noreply@ikimina.app>',
+        'to': [email],
+        'subject': 'Your Ikimina two-factor authentication code',
+        'html': _build2FAOtpHtml(displayName, otp),
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      await _db.collection('2fa_otps').doc(email).delete();
+      throw Exception('Failed to send 2FA code. Please try again.');
+    }
+  }
+
+  // ── Verify 2FA OTP ────────────────────────────────────────────
+  Future<OtpResult> verify2FAOtp(String email, String enteredOtp) async {
+    try {
+      final doc = await _db.collection('2fa_otps').doc(email).get();
+      if (!doc.exists) return OtpResult.notFound;
+
+      final data = doc.data()!;
+      final storedOtp = data['otp'] as String;
+      final expiresAt = (data['expiresAt'] as Timestamp).toDate();
+      final verified = data['verified'] as bool? ?? false;
+      final attempts = data['attempts'] as int? ?? 0;
+
+      if (verified) return OtpResult.alreadyUsed;
+
+      if (attempts >= 5) {
+        await _db.collection('2fa_otps').doc(email).delete();
+        return OtpResult.expired;
+      }
+
+      if (DateTime.now().isAfter(expiresAt)) {
+        await _db.collection('2fa_otps').doc(email).delete();
+        return OtpResult.expired;
+      }
+
+      if (enteredOtp.trim() != storedOtp) {
+        await _db.collection('2fa_otps').doc(email).update({
+          'attempts': FieldValue.increment(1),
+        });
+        return OtpResult.invalid;
+      }
+
+      await _db.collection('2fa_otps').doc(email).update({'verified': true});
+      return OtpResult.success;
+    } catch (_) {
+      return OtpResult.notFound;
+    }
+  }
+
+  Future<void> delete2FAOtp(String email) async {
+    try {
+      await _db.collection('2fa_otps').doc(email).delete();
+    } catch (_) {}
+  }
+
+  // ── Send Login 2FA OTP ────────────────────────────────────────
+  // Used when a user with 2FA enabled signs in — distinct from the
+  // setup flow so the email subject and body reflect a login event.
+  Future<void> sendLogin2FAOtp(
+    String uid,
+    String email, {
+    String name = '',
+  }) async {
+    final displayName = name.isNotEmpty ? name : email.split('@')[0];
+    final otp = _generateOtp();
+    final expires = DateTime.now().add(const Duration(minutes: 10));
+
+    await _db.collection('2fa_otps').doc(email).set({
+      'uid': uid,
+      'otp': otp,
+      'email': email,
+      'expiresAt': Timestamp.fromDate(expires),
+      'verified': false,
+      'attempts': 0,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    final response = await http.post(
+      Uri.parse(_resendUrl),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'from': 'Ikimina <noreply@ikimina.app>',
+        'to': [email],
+        'subject': 'Your Ikimina login verification code',
+        'html': _buildLogin2FAOtpHtml(displayName, otp),
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      await _db.collection('2fa_otps').doc(email).delete();
+      throw Exception('Failed to send login code. Please try again.');
+    }
+  }
+
+  // ── Login 2FA Email HTML ──────────────────────────────────────
+  String _buildLogin2FAOtpHtml(String name, String otp) {
+    final year = DateTime.now().year;
+    final now = DateTime.now();
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} UTC';
+    final digits = otp.split('').map((d) => '''
+      <td style="padding-right:8px;">
+        <div style="width:44px;height:56px;background:#ffffff;
+          border:2px solid #e0e0db;text-align:center;line-height:56px;
+          font-family:'Sora',Arial,sans-serif;
+          font-size:24px;font-weight:800;color:#1A1A1A;">$d</div>
+      </td>''').join();
+
+    return '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Ikimina – Login Verification Code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:'Sora',Arial,sans-serif;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+        <!-- LOGO -->
+        <tr><td style="padding-bottom:40px;">
+          <span style="font-size:22px;font-weight:800;letter-spacing:0.5px;color:#1A1A1A;">Ikimina</span><br/>
+          <span style="font-size:10px;font-weight:400;letter-spacing:3px;color:#aaaaaa;text-transform:uppercase;">Smart Group Savings</span>
+        </td></tr>
+
+        <!-- GREETING -->
+        <tr><td style="font-size:15px;color:#111111;padding-bottom:12px;font-weight:500;">
+          Hello $name,
+        </td></tr>
+
+        <!-- MESSAGE -->
+        <tr><td style="font-size:15px;color:#111111;line-height:1.7;padding-bottom:28px;">
+          A <strong>login attempt</strong> was made to your Ikimina account at
+          <strong>$timeStr</strong>. Enter the code below to complete the sign-in.
+          If this wasn't you, change your password immediately.
+        </td></tr>
+
+        <!-- LOGIN DETAILS BOX -->
+        <tr><td style="padding-bottom:28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="background:#f5f5f3;padding:20px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="font-size:10px;font-weight:600;letter-spacing:3px;color:#aaaaaa;text-transform:uppercase;padding-bottom:10px;">
+                  Login Details
+                </td></tr>
+                <tr><td style="font-size:14px;font-weight:500;color:#333333;line-height:2;">
+                  Account:&nbsp;&nbsp;<strong style="color:#1A1A1A;">$name</strong><br/>
+                  Time:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong style="color:#1A1A1A;">$timeStr</strong>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <!-- OTP SECTION LABEL -->
+        <tr><td style="font-size:15px;color:#111111;line-height:1.7;padding-bottom:20px;">
+          Use this code to complete your sign-in:
+        </td></tr>
+
+        <!-- OTP BOX -->
+        <tr><td style="padding-bottom:28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="background:#f5f5f3;padding:32px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="font-size:10px;font-weight:600;letter-spacing:3px;color:#aaaaaa;text-transform:uppercase;padding-bottom:8px;">
+                  Login Code
+                </td></tr>
+                <tr><td style="font-size:12px;color:#888888;padding-bottom:16px;">
+                  Enter this code in the Ikimina app
+                </td></tr>
+                <tr><td style="padding-bottom:20px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>$digits</tr>
+                  </table>
+                </td></tr>
+                <tr><td style="font-size:12px;color:#888888;">
+                  Expires in <strong style="color:#111111;">10 minutes</strong>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <!-- NOTICE -->
+        <tr><td style="font-size:14px;color:#555555;line-height:1.7;padding-bottom:36px;">
+          If you did not attempt to log in, please ignore this email and
+          <strong style="color:#1A1A1A;">change your password immediately</strong>.
+          Never share this code with anyone &mdash; Ikimina staff will never ask for it.
+        </td></tr>
+
+        <!-- DIVIDER -->
+        <tr><td style="padding-bottom:20px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="border-top:1px solid #e0e0db;font-size:0;line-height:0;">&nbsp;</td></tr>
+          </table>
+        </td></tr>
+
+        <!-- FOOTER -->
+        <tr><td style="font-size:13px;padding-bottom:40px;">
+          <span style="color:#1A1A1A;font-weight:700;">Ikimina</span>
+          <span style="color:#aaaaaa;"> &copy; $year &mdash; Smart Group Savings</span>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>''';
+  }
+
+  // ── 2FA OTP Email HTML ────────────────────────────────────────
+  String _build2FAOtpHtml(String name, String otp) {
+    final year = DateTime.now().year;
+    final digits = otp.split('').map((d) => '''
+      <td style="padding-right:8px;">
+        <div style="width:44px;height:56px;background:#ffffff;
+          border:2px solid #e0e0db;text-align:center;line-height:56px;
+          font-family:'Sora',Arial,sans-serif;
+          font-size:24px;font-weight:800;color:#1A1A1A;">$d</div>
+      </td>''').join();
+
+    return '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Ikimina – Two-Factor Authentication Code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:'Sora',Arial,sans-serif;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+        <!-- LOGO -->
+        <tr><td style="padding-bottom:40px;">
+          <span style="font-size:22px;font-weight:800;letter-spacing:0.5px;color:#1A1A1A;">Ikimina</span><br/>
+          <span style="font-size:10px;font-weight:400;letter-spacing:3px;color:#aaaaaa;text-transform:uppercase;">Smart Group Savings</span>
+        </td></tr>
+
+        <!-- GREETING -->
+        <tr><td style="font-size:15px;color:#111111;padding-bottom:12px;font-weight:500;">
+          Hello $name,
+        </td></tr>
+
+        <!-- MESSAGE -->
+        <tr><td style="font-size:15px;color:#111111;line-height:1.7;padding-bottom:28px;">
+          You requested to enable <strong>two-factor authentication</strong> on your Ikimina account.
+          Use the code below to complete the setup. This code expires in <strong>10 minutes</strong>.
+        </td></tr>
+
+        <!-- SECURITY NOTICE BOX -->
+        <tr><td style="padding-bottom:28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="background:#f5f5f3;padding:20px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="font-size:10px;font-weight:600;letter-spacing:3px;color:#aaaaaa;text-transform:uppercase;padding-bottom:10px;">
+                  Security Notice
+                </td></tr>
+                <tr><td style="font-size:14px;font-weight:500;color:#333333;line-height:1.8;">
+                  &mdash;&nbsp;&nbsp;Never share this code with anyone<br/>
+                  &mdash;&nbsp;&nbsp;Ikimina staff will never ask for this code<br/>
+                  &mdash;&nbsp;&nbsp;If you did not request this, secure your account immediately
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <!-- OTP SECTION LABEL -->
+        <tr><td style="font-size:15px;color:#111111;line-height:1.7;padding-bottom:20px;">
+          Enter this code in the Ikimina app to enable 2FA:
+        </td></tr>
+
+        <!-- OTP BOX -->
+        <tr><td style="padding-bottom:28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="background:#f5f5f3;padding:32px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="font-size:10px;font-weight:600;letter-spacing:3px;color:#aaaaaa;text-transform:uppercase;padding-bottom:8px;">
+                  2FA Verification Code
+                </td></tr>
+                <tr><td style="font-size:12px;color:#888888;padding-bottom:16px;">
+                  Enter this code in the Ikimina app
+                </td></tr>
+                <tr><td style="padding-bottom:20px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>$digits</tr>
+                  </table>
+                </td></tr>
+                <tr><td style="font-size:12px;color:#888888;">
+                  Expires in <strong style="color:#111111;">10 minutes</strong>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <!-- NOTICE -->
+        <tr><td style="font-size:14px;color:#555555;line-height:1.7;padding-bottom:36px;">
+          If you did not request to enable two-factor authentication, please ignore this email
+          and ensure your account password is secure.
+        </td></tr>
+
+        <!-- DIVIDER -->
+        <tr><td style="padding-bottom:20px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="border-top:1px solid #e0e0db;font-size:0;line-height:0;">&nbsp;</td></tr>
+          </table>
+        </td></tr>
+
+        <!-- FOOTER -->
+        <tr><td style="font-size:13px;padding-bottom:40px;">
+          <span style="color:#1A1A1A;font-weight:700;">Ikimina</span>
+          <span style="color:#aaaaaa;"> &copy; $year &mdash; Smart Group Savings</span>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>''';
+  }
+
   // ── OTP + Welcome Email HTML ──────────────────────────────────
   String _buildOtpHtml(String name, String otp) {
     final year = DateTime.now().year;

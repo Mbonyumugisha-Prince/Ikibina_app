@@ -18,6 +18,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   // Reads emailVerified from the Firestore user document
   bool get isEmailVerified => _user?.emailVerified ?? false;
+  bool get twoFactorEnabled => _user?.twoFactorEnabled ?? false;
 
   AuthProvider() {
     _authService.authStateChanges.listen(_onAuthStateChanged);
@@ -184,6 +185,101 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await _authService.updatePhotoUrl(photoUrl);
+      _user = await _authService.getCurrentUserProfile();
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Sends a login verification OTP to the current user's email.
+  /// Uses a login-specific email template, distinct from the 2FA setup email.
+  Future<bool> sendLogin2FAOtp() async {
+    final uid = _authService.currentUser?.uid ?? '';
+    final email = _authService.currentUser?.email ?? '';
+    final name = _user?.name ?? '';
+    try {
+      await _otpService.sendLogin2FAOtp(uid, email, name: name);
+      _error = null;
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    }
+  }
+
+  /// Verifies the login 2FA OTP without changing the twoFactorEnabled flag.
+  Future<bool> verifyLogin2FAOtp(String otp) async {
+    final email = _authService.currentUser?.email ?? '';
+    _setLoading(true);
+    try {
+      final result = await _otpService.verify2FAOtp(email, otp);
+      if (result == OtpResult.success) {
+        _error = null;
+        return true;
+      }
+      _error = _otpResultMessage(result);
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Re-authenticates with password, then sends a 2FA OTP to the user's email.
+  Future<bool> initiate2FASetup(String password) async {
+    _setLoading(true);
+    try {
+      await _authService.reauthenticate(password);
+      final email = _authService.currentUser?.email ?? '';
+      final name = _user?.name ?? '';
+      final uid = _authService.currentUser?.uid ?? '';
+      await _otpService.send2FAOtp(uid, email, name: name);
+      _error = null;
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Verifies the 2FA OTP and enables 2FA on success.
+  Future<bool> verify2FAAndEnable(String otp) async {
+    final email = _authService.currentUser?.email ?? '';
+    _setLoading(true);
+    try {
+      final result = await _otpService.verify2FAOtp(email, otp);
+      if (result == OtpResult.success) {
+        await _authService.set2FAEnabled(true);
+        _user = await _authService.getCurrentUserProfile();
+        _error = null;
+        notifyListeners();
+        return true;
+      }
+      _error = _otpResultMessage(result);
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Disables 2FA for the current user.
+  Future<bool> disable2FA() async {
+    _setLoading(true);
+    try {
+      await _authService.set2FAEnabled(false);
       _user = await _authService.getCurrentUserProfile();
       _error = null;
       notifyListeners();
