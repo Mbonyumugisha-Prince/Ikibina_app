@@ -11,6 +11,7 @@ import '../../widgets/user_avatar.dart';
 import '../loans/pay_loan_screen.dart';
 import '../loans/request_loan_screen.dart';
 import 'edit_group_screen.dart';
+import 'group_penalties_screen.dart';
 import 'invite_member_screen.dart';
 import 'member_detail_screen.dart';
 
@@ -56,8 +57,8 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           : ['Members', 'Leaderboard', 'Milestones', 'Info'];
     }
     return _isAdmin
-        ? ['Members', 'Late Payments', 'Loan Request', 'Info', 'Contributions']
-        : ['Members', 'Loan Request', 'Info'];
+        ? ['Members', 'Late Payments', 'Loan Request', 'Info', 'Penalties', 'Contributions']
+        : ['Members', 'Loan Request', 'Info', 'Penalties'];
   }
 
   @override
@@ -85,6 +86,12 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         return _MilestonesTab(group: _group);
       case 'Info':
         return _InfoTab(group: _group, isAdmin: _isAdmin);
+      case 'Penalties':
+        return GroupPenaltiesTab(
+          group: _group,
+          isAdmin: _isAdmin,
+          currentUserId: widget.currentUserId,
+        );
       case 'Contributions':
         return _ContributionsTab(group: _group);
       default:

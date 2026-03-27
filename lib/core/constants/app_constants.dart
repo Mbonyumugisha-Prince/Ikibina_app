@@ -10,6 +10,9 @@ class AppConstants {
   static const String contributionsCollection = 'contributions';
   static const String transactionsCollection = 'transactions';
   static const String loansCollection = 'loans';
+  static const String penaltyRecordsCollection = 'penaltyRecords';
+  static const String penaltyChecksCollection = 'penaltyChecks';
+  static const String notificationsCollection = 'notifications';
 
   // Firebase Storage paths
   static const String profileImagesPath = 'profile_images';
@@ -42,4 +45,10 @@ class AppConstants {
   static const String transactionLoan = 'loan';
   static const String transactionWithdrawal = 'withdrawal';
   static const String transactionFine = 'fine';
+
+  // Penalty types
+  static const String penaltyGentleReminder = 'gentle_reminder';
+  static const String penaltyLateFee = 'late_fee';
+  static const String penaltyAccountFreeze = 'account_freeze';
+  static const String penaltyExpulsion = 'expulsion';
 }
