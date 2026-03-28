@@ -1,30 +1,76 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// App-level widget smoke tests.
+// These verify that core reusable widgets render without errors.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ikibina/app.dart' as app;
-
+import 'package:ikibina/widgets/common/custom_button.dart';
+import 'package:ikibina/widgets/common/custom_text_field.dart';
+import 'package:ikibina/widgets/common/loading_indicator.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const app.IkibinaApp());
+  // ──────────────────────────────────────────
+  // CustomButton smoke tests
+  // ──────────────────────────────────────────
+  group('CustomButton smoke tests', () {
+    testWidgets('renders without error', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: CustomButton(label: 'Test')),
+      ));
+      expect(find.byType(CustomButton), findsOneWidget);
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    testWidgets('label is visible', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: CustomButton(label: 'Submit')),
+      ));
+      expect(find.text('Submit'), findsOneWidget);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    testWidgets('loading state hides label and shows spinner', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: CustomButton(label: 'Submit', loading: true)),
+      ));
+      expect(find.text('Submit'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  // ──────────────────────────────────────────
+  // CustomTextField smoke tests
+  // ──────────────────────────────────────────
+  group('CustomTextField smoke tests', () {
+    testWidgets('renders without error', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: CustomTextField(label: 'Name')),
+      ));
+      expect(find.byType(CustomTextField), findsOneWidget);
+    });
+
+    testWidgets('label is visible', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: CustomTextField(label: 'Full Name')),
+      ));
+      expect(find.text('Full Name'), findsOneWidget);
+    });
+  });
+
+  // ──────────────────────────────────────────
+  // LoadingIndicator smoke tests
+  // ──────────────────────────────────────────
+  group('LoadingIndicator smoke tests', () {
+    testWidgets('renders spinner without message', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: LoadingIndicator()),
+      ));
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('renders spinner with optional message', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(body: LoadingIndicator(message: 'Please wait...')),
+      ));
+      expect(find.text('Please wait...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
   });
 }
